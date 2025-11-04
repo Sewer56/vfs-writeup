@@ -1,0 +1,69 @@
+site_name: VFS Writeup
+
+repo_name: sewer/vfs-writeup
+repo_url: https://github.com/sewer/vfs-writeup
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/sewer
+
+extra_css:
+  - vendor/Reloaded/Stylesheets/reloaded.css
+
+markdown_extensions:
+  - admonition
+  - tables
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tasklist
+  - def_list
+  - meta
+  - md_in_html
+  - attr_list
+  - footnotes
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+theme:
+  name: material
+  palette:
+    scheme: reloaded3-slate
+  features:
+    - navigation.instant
+
+plugins:
+  - search
+  - exclude-unused-files:
+      file_types_to_check: [ "psd", "7z", "kra", "avif" ]
+      file_types_override_mode: append
+      enabled: true
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+        remove_comments: true
+      cache_safe: true
+  - exclude:
+      # Exclude the Theme's own files.
+      glob:
+        - Reloaded/docs/Pages/private/*
+        - Reloaded/docs/*.txt
+        - Reloaded/.gitignore
+        - Reloaded/Readme.md
+        - Reloaded/LICENSE
+        - Reloaded/*.yml
+        - Reloaded/*.py
+        - Reloaded/venv/*
+
+nav:
+  - Home: index.md

@@ -1,1 +1,18 @@
 Reloaded-III/
+
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# MkDocs build output
+site/
+
+# LLM Prompt Files
+PROMPT-*.md
