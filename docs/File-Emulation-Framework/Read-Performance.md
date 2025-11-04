@@ -86,5 +86,5 @@ Performance here improved.
 
 !!! warning "Bottlenecked by PCI-E 3 on test system"
 
-[merged-file-cache]: ../../Libraries/Merged-File-Cache/About.md
+[merged-file-cache]: https://reloaded-project.github.io/Reloaded-III/Mods/Libraries/Merged-File-Cache/About.html
 [performance]: ./About.md#performance-impact

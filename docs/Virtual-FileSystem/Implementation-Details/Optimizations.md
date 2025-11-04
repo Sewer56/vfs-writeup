@@ -188,7 +188,7 @@ The `LookupTree` allows us to resolve file paths in O(3) time, at expense of som
 [ahash]: https://github.com/tkaitchuck/aHash
 [equivalent]: https://docs.rs/hashbrown/latest/hashbrown/trait.Equivalent.html
 [godbolt-string-widen]: https://godbolt.org/z/K18b81rE8
-[hashing]: ../../../../Common/Hashing.md
+[hashing]: https://reloaded-project.github.io/Reloaded-III/Common/Hashing.html
 [hashtable]: https://docs.rs/hashbrown/latest/hashbrown/struct.HashTable.html#method.find
 [lookup-tree]: ./Trees.md#lookup-tree
 [make-ascii-uppercase]: https://github.com/rust-lang/rust/blob/80d1c8349ab7f1281b9e2f559067380549e2a4e6/library/core/src/num/mod.rs#L627

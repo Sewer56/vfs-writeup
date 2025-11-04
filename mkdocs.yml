@@ -42,6 +42,7 @@ theme:
 
 plugins:
   - search
+  - offline
   - exclude-unused-files:
       file_types_to_check: ["psd", "7z", "kra", "avif"]
       file_types_override_mode: append
