@@ -43,7 +43,7 @@ theme:
 plugins:
   - search
   - exclude-unused-files:
-      file_types_to_check: [ "psd", "7z", "kra", "avif" ]
+      file_types_to_check: ["psd", "7z", "kra", "avif"]
       file_types_override_mode: append
       enabled: true
   - minify:
@@ -67,3 +67,26 @@ plugins:
 
 nav:
   - Home: index.md
+  - File Emulation Framework:
+      - About: File-Emulation-Framework/About.md
+      - Routing: File-Emulation-Framework/Routing.md
+      - Read Performance: File-Emulation-Framework/Read-Performance.md
+      - Emulator Development:
+          - Implementing Emulator: File-Emulation-Framework/Emulator-Development/Implementing-Emulator.md
+          - Guidelines: File-Emulation-Framework/Emulator-Development/Guidelines.md
+          - Emulator API: File-Emulation-Framework/Emulator-Development/Emulator-API.md
+          - Framework API: File-Emulation-Framework/Emulator-Development/Framework-API.md
+          - Routing: File-Emulation-Framework/Emulator-Development/Routing.md
+          - Cookbook: File-Emulation-Framework/Emulator-Development/Emulator-Cookbook.md
+      - Implementation Details:
+          - Hooks: File-Emulation-Framework/Implementation-Details/Hooks.md
+  - Virtual FileSystem:
+      - About: Virtual-FileSystem/About.md
+      - Usage: Virtual-FileSystem/Usage.md
+      - Programmer Usage: Virtual-FileSystem/Programmer-Usage.md
+      - Behaviours & Limitations: Virtual-FileSystem/Behaviours-Limitations.md
+      - Performance: Virtual-FileSystem/Performance.md
+      - Implementation Details:
+          - Hooks: Virtual-FileSystem/Implementation-Details/Hooks.md
+          - Trees: Virtual-FileSystem/Implementation-Details/Trees.md
+          - Optimizations: Virtual-FileSystem/Implementation-Details/Optimizations.md
