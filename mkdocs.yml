@@ -68,6 +68,16 @@ plugins:
 
 nav:
   - Home: index.md
+  - Virtual FileSystem:
+      - About: Virtual-FileSystem/About.md
+      - Usage: Virtual-FileSystem/Usage.md
+      - Programmer Usage: Virtual-FileSystem/Programmer-Usage.md
+      - Behaviours & Limitations: Virtual-FileSystem/Behaviours-Limitations.md
+      - Performance: Virtual-FileSystem/Performance.md
+      - Implementation Details:
+          - Hooks: Virtual-FileSystem/Implementation-Details/Hooks.md
+          - Trees: Virtual-FileSystem/Implementation-Details/Trees.md
+          - Optimizations: Virtual-FileSystem/Implementation-Details/Optimizations.md
   - File Emulation Framework:
       - About: File-Emulation-Framework/About.md
       - Routing: File-Emulation-Framework/Routing.md
@@ -81,13 +91,6 @@ nav:
           - Cookbook: File-Emulation-Framework/Emulator-Development/Emulator-Cookbook.md
       - Implementation Details:
           - Hooks: File-Emulation-Framework/Implementation-Details/Hooks.md
-  - Virtual FileSystem:
-      - About: Virtual-FileSystem/About.md
-      - Usage: Virtual-FileSystem/Usage.md
-      - Programmer Usage: Virtual-FileSystem/Programmer-Usage.md
-      - Behaviours & Limitations: Virtual-FileSystem/Behaviours-Limitations.md
-      - Performance: Virtual-FileSystem/Performance.md
-      - Implementation Details:
-          - Hooks: Virtual-FileSystem/Implementation-Details/Hooks.md
-          - Trees: Virtual-FileSystem/Implementation-Details/Trees.md
-          - Optimizations: Virtual-FileSystem/Implementation-Details/Optimizations.md
+  - Plugins:
+      - Nx2VFS: Plugins/Nx2VFS.md
+      - Archive Emulation Framework: Plugins/Archive-Emulation-Framework.md

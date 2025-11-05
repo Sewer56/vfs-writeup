@@ -23,10 +23,12 @@ These in turn are used by the higher level APIs in `kernel32.dll` such as `Creat
 
 On both Windows, and Wine, all higher level APIs pass through these functions.
 
-### NtCreateFile
+### NtCreateFile & NtOpenFile
 
 Intercepts file creation and opening operations.
 This keeps track of and creates `route`(s) for emulated files.
+
+Both `NtCreateFile` (for creation/opening) and `NtOpenFile` (for opening existing files) are hooked to ensure emulated files are detected regardless of which API the application uses.
 
 In addition this calls into the emulators, invoking the `try_create_file` method.
 
