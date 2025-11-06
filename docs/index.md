@@ -205,10 +205,17 @@ Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
     
     This single interception point also works with Wine on Linux, since `Wine` aims to implement Win32 as closely as possible; and that includes its relationship between `kernel32.dll` and `ntdll.dll`.
 
+!!! note "This graph was last updated in 6th December 2025."
+
+    Using Windows 11 25H2 as reference.
+    
+    Irrelevant APIs (e.g. Path Conversion `RtlDosPathNameToRelativeNtPathName`) are omitted for clarity; these converted paths will be passed to our hooks, e.g. `NtCreateFile_Hook`, in which case we do not need to concern ourselves with them.
+
+    This graph focuses on the ***entry points*** into the VFS. Some redundant calls are considered. e.g. A function calling `NtClose` after calling `NtCreateFile` to clean up will point only to `NtCreateFile`. (We don't do anything in `NtClose`, other than update internal state.)
 
 ```mermaid
 flowchart LR
-    subgraph Win32
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
 
     %% Definitions
     FindFirstFileA
@@ -219,11 +226,17 @@ flowchart LR
     FindNextFileA
     FindNextFileW
 
+    CreateDirectory2A
+    CreateDirectory2W
     CreateDirectoryA
     CreateDirectoryW
+    InternalCreateDirectoryW
+    InternalCreateDirectoryW_Old
     CreateFileA
     CreateFileW
     CreateFile2
+    CreateFile3
+    CreateFileInternal
     CreateFile2FromAppW
     CreateFileFromAppW
     CreateDirectoryExW
@@ -234,6 +247,14 @@ flowchart LR
     GetCompressedFileSizeA
     GetCompressedFileSizeW
     CloseHandle
+
+    CreateFileMapping2
+    CreateFileMappingFromApp
+    CreateFileMappingNumaW
+    CreateFileMappingW
+
+    CreateHardLinkA
+    CreateHardLinkW
 
     GetFileAttributesA
     GetFileAttributesExA
@@ -253,9 +274,17 @@ flowchart LR
     FindFirstFileExA --> FindFirstFileExW
     FindFirstFileExFromAppW --> FindFirstFileExW
     FindNextFileA --> FindNextFileW
+    CreateDirectory2A --> InternalCreateDirectoryW
+    CreateDirectory2W --> InternalCreateDirectoryW
     CreateDirectoryA --> CreateDirectoryW
+    CreateDirectoryW --> InternalCreateDirectoryW
+    CreateDirectoryW --> InternalCreateDirectoryW_Old
+    CreateFileA --> CreateFileInternal
+    CreateFileW --> CreateFileInternal
+    CreateFile2 --> CreateFileInternal
+    CreateFile3 --> CreateFileInternal
     CreateFile2FromAppW --> CreateFile2
-    CreateDirectoryFromAppW --> CreateDirectoryExW
+    CreateDirectoryFromAppW --> CreateDirectoryW
     CreateFileFromAppW --> CreateFile2FromAppW
     DeleteFileFromAppW --> DeleteFileW
     DeleteFileA --> DeleteFileW
@@ -267,6 +296,8 @@ flowchart LR
     RemoveDirectoryFromAppW --> RemoveDirectoryW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesA --> SetFileAttributesW
+    CreateFileMappingFromApp --> CreateFileMappingNumaW
+    CreateHardLinkA --> CreateHardLinkW
     end
 
     subgraph NT API
@@ -278,6 +309,10 @@ flowchart LR
     NtDeleteFile
     NtQueryAttributesFile
     NtQueryFullAttributesFile
+    NtQueryInformationFile
+    NtSetInformationFile
+    NtCreateSection
+    NtCreateSectionEx
     NtClose
 
     %%% Win32 -> NT API
@@ -286,16 +321,25 @@ flowchart LR
     FindFirstFileW --> NtOpenFile
     FindFirstFileW --> NtQueryDirectoryFileEx
     FindNextFileW --> NtQueryDirectoryFileEx
-    CreateFileA --> NtCreateFile
-    CreateFileW --> NtCreateFile
-    CreateFile2 --> NtCreateFile
+    CreateFileInternal --> NtCreateFile
+    CreateFileInternal --> NtSetInformationFile
+    CreateFileInternal --> NtQueryInformationFile
     CreateDirectoryW --> NtCreateFile
+    InternalCreateDirectoryW --> NtCreateFile
+    InternalCreateDirectoryW_Old --> NtCreateFile
     CreateDirectoryExW --> NtOpenFile
+    CreateDirectoryExW --> NtQueryInformationFile
     CreateDirectoryExW --> NtCreateFile
+    CreateDirectoryExW --> NtSetInformationFile
     DeleteFileW --> NtOpenFile
     RemoveDirectoryW --> NtOpenFile
     GetCompressedFileSizeW --> NtOpenFile
     CloseHandle --> NtClose
+    CreateFileMapping2 --> NtCreateSectionEx
+    CreateFileMappingNumaW --> NtCreateSection
+    CreateFileMappingW --> NtCreateSection
+    CreateHardLinkW --> NtOpenFile
+    CreateHardLinkW --> NtSetInformationFile
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     SetFileAttributesW --> NtOpenFile
@@ -323,6 +367,45 @@ flowchart LR
     NtClose --> NtClose_Hook
     end
 ```
+
+??? note "Notable Functions we probably won't ever need but FYI"
+
+    - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions.
+    - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
+
+??? note "Roots (as of Windows 11 25H2)"
+
+    [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) is also a good resource.
+
+    KernelBase.dll (Files):
+    - ✅ `CreateDirectory2A`
+    - ✅ `CreateDirectory2W`
+    - ✅ `InternalCreateDirectoryW`
+    - ✅ `CreateDirectoryA`
+    - ✅ `CreateDirectoryExW`
+    - ✅ `CreateDirectoryFromAppW`
+    - ✅ `CreateFile2`
+    - ✅ `CreateFile2FromAppW`
+    - ✅ `CreateFile3`
+    - ✅ `CreateFileA`
+    - ✅ `CreateFileFromAppW`
+    - ✅ `CreateFileW`
+
+    KernelBase.dll (Memory Mapping):
+    - ✅ `CreateFileMapping2`
+    - ✅ `CreateFileMappingFromApp`
+    - ✅ `CreateFileMappingNumaW`
+    - ✅ `CreateFileMappingW`
+  
+    - KernelBase.dll (Links / Write):
+    - ✅ `CreateHardLinkA`
+    - ✅ `CreateHardLinkW`
+
+    KernelBase.dll (UWP - uses another process - not investigated):
+    - BrokeredCreateDirectoryW
+
+    KernelBase.dll (WTF?):
+    - `CreateFileDowngrade_Win7` - 1 liner that adds a flag to a pointer passed in.
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
