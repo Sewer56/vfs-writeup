@@ -11,9 +11,11 @@ The architecture separates concerns into two distinct layers, each with specific
 
 !!! warning "Logical Layer Separation"
 
-    These layers represent logical architectural boundaries, not necessarily separate binaries or libraries.
+    These layers represent logical ***architectural boundaries***, not necessarily separate binaries or libraries.
     
-    Simply, don't mix Layer 1 & 2 code, or you'll make a mess of it.
+    Simply, don't mix Layer 1 & 2 code, or you'll make a mess of it; put them in separate files
+    or projects!
+
     Keep Layer 1 code focused on path operations and Layer 2 code focused on data synthesis.
 
 ### Layer 1: Virtual FileSystem
@@ -32,17 +34,19 @@ Layer 1 operates at the path/metadata level. It doesn't care about file contents
 
 #### Layer 1 Key APIs
 
-- **`RegisterVirtualFile(path, metadata)`** — Make a virtual file visible in directory searches. Layer 2 calls this to register emulated files so they appear when games search directories.
+- **`AddRedirect(sourcePath, targetPath)`** - Redirect individual file paths.
 
-- **`UnregisterVirtualFile(handle)`** — Remove a virtual file from directory search results.
+- **`RemoveRedirect(handle)`** - Remove an individual redirect.
 
-- **`AddRedirect(sourcePath, targetPath)`** — Redirect individual file paths.
+- **`AddRedirectFolder(sourceFolder, targetFolder)`** - Overlay entire folder structure. Files in targetFolder appear in sourceFolder.
 
-- **`RemoveRedirect(handle)`** — Remove an individual redirect.
+- **`RemoveRedirectFolder(handle)`** - Remove a folder overlay.
 
-- **`AddRedirectFolder(sourceFolder, targetFolder)`** — Overlay entire folder structure. Files in targetFolder appear in sourceFolder.
+And this private API:
 
-- **`RemoveRedirectFolder(handle)`** — Remove a folder overlay.
+- **`RegisterVirtualFile(path, metadata)`** - Make a virtual file visible in directory searches. Layer 2 calls this to register virtual files so they appear when games search directories.
+
+- **`UnregisterVirtualFile(handle)`** - Remove a virtual file from directory search results.
 
 ### Layer 2: Virtual File Framework
 
@@ -59,7 +63,7 @@ and Layer 2 will handle all of the interactions with the operating system for th
 
 #### Layer 2 Key APIs
 
-[TODO]
+- **`RegisterVirtualFile(path, metadata, fileHandler)`** - Allows extensions to create virtual files that Layer 1 will make visible in directory searches. The `metadata` is immutable metadata about file (e.g. size), the `fileHandler` parameter is an object that implements methods for handling read operations.
 
 ### Layer 3: Extensions
 
@@ -72,9 +76,11 @@ and Layer 2 will handle all of the interactions with the operating system for th
 
 **Nx2VFS** is a practical implementation that uses Layer 2 to provide an archive-backed filesystem. Games see normal files on disk, but they're actually backed by compressed `.nx2` archives containing multiple files.
 
-In this case, Nx2VFS would call Layer 2's `RegisterVirtualFile()`
+In this case, Nx2VFS would call Layer 2's `RegisterVirtualFile()` for each file contained in the original `.nx2` archive. And a `fileHandler` implementation to fill in the actual data.
 
 #### Example Extension: Archive Emulation Framework
+
+
 
 ### Layer Interaction
 
@@ -156,21 +162,21 @@ When an application tries to open `game/data.pak`, Layer 1 can transparently ope
 
 ### Hooked APIs
 
-- **`NtCreateFile`** — Intercept file creation operations. Check if path should be redirected when creating new files. Substitute with target path before calling original API.
+- **`NtCreateFile`** - Intercept file creation operations. Check if path should be redirected when creating new files. Substitute with target path before calling original API.
 
-- **`NtOpenFile`** — Intercept file open operations. Check if path should be redirected when opening existing files. Substitute with target path before calling original API.
+- **`NtOpenFile`** - Intercept file open operations. Check if path should be redirected when opening existing files. Substitute with target path before calling original API.
 
-- **`NtQueryDirectoryFile`** — Inject virtual files into directory search results (pre-Windows 10 / Wine). When application searches a directory, inject registered virtual files into the result set.
+- **`NtQueryDirectoryFile`** - Inject virtual files into directory search results (pre-Windows 10 / Wine). When application searches a directory, inject registered virtual files into the result set.
 
-- **`NtQueryDirectoryFileEx`** — Inject virtual files into directory search results (Windows 10+). On Windows 10+, this is the primary API. Both APIs are hooked with recursion detection.
+- **`NtQueryDirectoryFileEx`** - Inject virtual files into directory search results (Windows 10+). On Windows 10+, this is the primary API. Both APIs are hooked with recursion detection.
 
-- **`NtQueryAttributesFile`** — Return metadata for virtual/redirected files. When application queries basic file attributes, return data for the redirected or virtual file.
+- **`NtQueryAttributesFile`** - Return metadata for virtual/redirected files. When application queries basic file attributes, return data for the redirected or virtual file.
 
-- **`NtQueryFullAttributesFile`** — Return full metadata for virtual/redirected files. When application queries extended file attributes (size, timestamps, etc.), return data for the redirected or virtual file.
+- **`NtQueryFullAttributesFile`** - Return full metadata for virtual/redirected files. When application queries extended file attributes (size, timestamps, etc.), return data for the redirected or virtual file.
 
-- **`NtDeleteFile`** — Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
+- **`NtDeleteFile`** - Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
 
-- **`NtClose`** — Track when file handles are closed. Used for internal handle lifecycle management.
+- **`NtClose`** - Track when file handles are closed. Used for internal handle lifecycle management.
 
 **[→ Complete Hook Flow Diagram](Virtual-FileSystem/Implementation-Details/Hooks.md)**
 
@@ -197,17 +203,17 @@ Uses Layer 1 to make emulated files visible in directory searches and to handle 
 
 ### Hooked APIs
 
-- **`NtCreateFile` & `NtOpenFile`** — Detect when an emulated file is being opened. Match the file path against registered emulator routes. If matched, call into the emulator's `try_create_file` method to initialize emulator state and create internal data structures for synthesizing the file.
+- **`NtCreateFile` & `NtOpenFile`** - Detect when an emulated file is being opened. Match the file path against registered emulator routes. If matched, call into the emulator's `try_create_file` method to initialize emulator state and create internal data structures for synthesizing the file.
 
-- **`NtReadFile`** — Intercept file read operations. If the file is being emulated, use the StreamSlice array to determine where data comes from. Read from source files/locations and return synthesized data instead of the original file data.
+- **`NtReadFile`** - Intercept file read operations. If the file is being emulated, use the StreamSlice array to determine where data comes from. Read from source files/locations and return synthesized data instead of the original file data.
 
-- **`NtSetInformationFile`** — Intercept handle update operations. Track file pointer position updates (seek operations). Emulated files need to maintain their own file pointer state so that read operations know where to read from.
+- **`NtSetInformationFile`** - Intercept handle update operations. Track file pointer position updates (seek operations). Emulated files need to maintain their own file pointer state so that read operations know where to read from.
 
-- **`NtQueryInformationFile`** — Intercept file information queries. Report the emulated file's size and attributes. The emulated file size may differ from the original file on disk.
+- **`NtQueryInformationFile`** - Intercept file information queries. Report the emulated file's size and attributes. The emulated file size may differ from the original file on disk.
 
-- **`NtQueryFullAttributesFile`** — Intercept file attribute queries. Report the emulated file's size and full attributes. Used when applications check file metadata without opening the file.
+- **`NtQueryFullAttributesFile`** - Intercept file attribute queries. Report the emulated file's size and full attributes. Used when applications check file metadata without opening the file.
 
-- **`NtClose`** — Intercept file close operations. Dispose of emulator internal state for the emulated file (such as current read offset). Free internal data structures for that emulated file instance.
+- **`NtClose`** - Intercept file close operations. Dispose of emulator internal state for the emulated file (such as current read offset). Free internal data structures for that emulated file instance.
 
 **[→ Complete Hook Details](File-Emulation-Framework/Implementation-Details/Hooks.md)**
 
