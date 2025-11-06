@@ -65,25 +65,25 @@ To use the Redirector API:
 
 ## IRedirectorService API
 
-!!! info "Using basic C# types for easier understanding. Actual types may vary."
+!!! info "Using Rust-style API signatures. Actual implementation may vary by language."
 
 ### Redirecting Individual Files
 
-- `RedirectHandle AddRedirect(string sourcePath, string targetPath)`: Redirects an individual file path from
-  `sourcePath` (original game path) to `targetPath` (mod file path). Returns a handle to the redirection.
+- `fn add_redirect(&self, source_path: &str, target_path: &str) -> RedirectHandle`: Redirects an individual file path from
+  `source_path` (original game path) to `target_path` (mod file path). Returns a handle to the redirection.
 
-- `void RemoveRedirect(RedirectHandle handle)`: Removes the redirection associated with the given `handle`.
+- `fn remove_redirect(&self, handle: RedirectHandle)`: Removes the redirection associated with the given `handle`.
 
 ### Redirecting All Files in Folder
 
-- `RedirectFolderHandle AddRedirectFolder(string sourceFolder, string targetFolder)`: Adds a new redirect folder.
-  Files in `targetFolder` will overlay files in `sourceFolder`. Returns a handle to the redirect folder.
+- `fn add_redirect_folder(&self, source_folder: &str, target_folder: &str) -> RedirectFolderHandle`: Adds a new redirect folder.
+  Files in `target_folder` will overlay files in `source_folder`. Returns a handle to the redirect folder.
 
-- `void RemoveRedirectFolder(RedirectFolderHandle handle)`: Removes the redirect folder associated with the given `handle`.
+- `fn remove_redirect_folder(&self, handle: RedirectFolderHandle)`: Removes the redirect folder associated with the given `handle`.
 
 ## IVfsService API
 
-!!! info "Using basic C# types for easier understanding. Actual types may vary."
+!!! info "Using Rust-style API signatures. Actual implementation may vary by language."
 
 ### Registering Virtual Files
 
@@ -92,25 +92,24 @@ To use the Redirector API:
     These APIs allow you to inject virtual files into search results, such that they appear
     alongside real files when game folders are being searched.
 
-- `VirtualFileHandle RegisterVirtualFile(string filePath, VirtualFileMetadata metadata)`: Registers a new virtual
-  file at `filePath` with the provided metadata. This allows the virtual file to be seen during file searches.
+- `fn register_virtual_file(&self, file_path: &str, metadata: VirtualFileMetadata) -> VirtualFileHandle`: Registers a new virtual
+  file at `file_path` with the provided metadata. This allows the virtual file to be seen during file searches.
   Returns a handle to the virtual file.
 
-- `void UnregisterVirtualFile(VirtualFileHandle handle)`: Unregisters the virtual file associated with the given `handle`.
+- `fn unregister_virtual_file(&self, handle: VirtualFileHandle)`: Unregisters the virtual file associated with the given `handle`.
 
 The `VirtualFileMetadata` structure should look something like:
 
-```csharp
+```rust
 // This may differ for Unix. That's to be determined.
-public struct VirtualFileMetadata
-{
-    public long CreationTime;
-    public long LastAccessTime;
-    public long LastWriteTime;
-    public long ChangeTime;
-    public long EndOfFile;
-    public long AllocationSize;
-    public FileAttributes FileAttributes;
+pub struct VirtualFileMetadata {
+    pub creation_time: i64,
+    pub last_access_time: i64,
+    pub last_write_time: i64,
+    pub change_time: i64,
+    pub end_of_file: i64,
+    pub allocation_size: i64,
+    pub file_attributes: FileAttributes,
 }
 ```
 
@@ -123,32 +122,31 @@ Actually reading the files etc. is handled by the file emulation framework itsel
 
 ## IVfsSettingsService API
 
-!!! info "Using basic C# types for easier understanding. Actual types may vary."
+!!! info "Using Rust-style API signatures. Actual implementation may vary by language."
 
 ### VFS Settings
 
-- `GetVfsSetting(VfsSettings setting)`: Gets the current value of a VFS setting.
+- `fn get_vfs_setting(&self, setting: VfsSettings) -> bool`: Gets the current value of a VFS setting.
   See `VfsSettings` enum for options.
 
-- `SetVfsSetting(bool enable, VfsSettings setting)`: Enables or disables a specific VFS setting.
+- `fn set_vfs_setting(&self, enable: bool, setting: VfsSettings)`: Enables or disables a specific VFS setting.
 
 The `VfsSettings` enum provides the following options:
 
-```csharp
-[Flags]
-public enum VfsSettings
-{
+```rust
+#[repr(u8)]
+pub enum VfsSettings {
     None = 0,                   // Default value.
     PrintRedirect = 1 << 0,     // Prints when a file redirect is performed.
     PrintOpen = 1 << 1,         // Prints file open operations. (debug setting)
     DontPrintNonFiles = 1 << 2, // Skips printing non-files to the console.
-    PrintGetAttributes = 1 << 3 // Prints operations that get file attributes (debug setting)
+    PrintGetAttributes = 1 << 3, // Prints operations that get file attributes (debug setting)
 }
 ```
 
 ### Debugging
 
-- `Enable()` / `Disable()`: Enables or disables the VFS entirely.
+- `fn enable(&self)` / `fn disable(&self)`: Enables or disables the VFS entirely.
 
 ## Examples
 

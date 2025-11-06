@@ -72,14 +72,14 @@ and Layer 2 will handle all of the interactions with the operating system for th
     Layer 3 forms the extensions that are built on top of Layers 1 & 2.
     Those can be thought of as 'plugins' that implement specific behaviours.
 
+#### Example Extension: Archive Emulation Framework
+
+
 #### Example Extension: Nx2VFS
 
 **Nx2VFS** is a practical implementation that uses Layer 2 to provide an archive-backed filesystem. Games see normal files on disk, but they're actually backed by compressed `.nx2` archives containing multiple files.
 
 In this case, Nx2VFS would call Layer 2's `RegisterVirtualFile()` for each file contained in the original `.nx2` archive. And a `fileHandler` implementation to fill in the actual data.
-
-#### Example Extension: Archive Emulation Framework
-
 
 
 ### Layer Interaction
