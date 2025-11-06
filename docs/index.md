@@ -30,6 +30,8 @@ The architecture separates concerns into two distinct layers, each with specific
 
 Layer 1 operates at the path/metadata level. It doesn't care about file contents, only about routing requests to the right location and making virtual files visible.
 
+i.e. **Layer 1** hooks path/metadata operations (`NtOpenFile`, `NtQueryDirectoryFile`, `NtQueryAttributesFile`, etc.)
+
 **[Complete Implementation Details →](Virtual-FileSystem/About.md)**
 
 #### Layer 1 Key APIs
@@ -61,9 +63,15 @@ and Layer 2 will handle all of the interactions with the operating system for th
 
 ***Layer 2 is an abstraction*** for the extensions in Layer 3.
 
+i.e. **Layer 2** hooks data operations (`NtReadFile`, `NtSetInformationFile`, etc.) and calls Layer 1's `RegisterVirtualFile()` API
+
 #### Layer 2 Key APIs
 
+These are public versions of Layer 1's private APIs:
+
 - **`RegisterVirtualFile(path, metadata, fileHandler)`** - Allows extensions to create virtual files that Layer 1 will make visible in directory searches. The `metadata` is immutable metadata about file (e.g. size), the `fileHandler` parameter is an object that implements methods for handling read operations.
+
+- **`UnregisterVirtualFile(handle)`** - Removes a virtual file registered earlier.
 
 ### Layer 3: Extensions
 
@@ -74,6 +82,47 @@ and Layer 2 will handle all of the interactions with the operating system for th
 
 #### Example Extension: Archive Emulation Framework
 
+!!! info "Originally part of Reloaded-II's `FileEmulationFramework`"
+
+The **Archive Emulation Framework** allows injecting files into game archives without writing code, using supported archive emulators that are built on top of the framework.
+
+It provides a declarative way to modify archive contents by simply placing files in specific folder structures.
+
+##### Route System
+
+Files are identified by their full path including archive nesting:
+
+```
+<GameFolder>/English/Sound.afs/00000.adx
+                    └ Archive ┘└ File Inside ┘
+```
+
+Emulators match against routes using partial path matching. A route pattern like `Sound.afs/00000.adx` matches any path ending with that pattern. More specific patterns take precedence:
+
+- `English/Sound.afs/00000.adx` matches only files in the English folder
+- `Sound.afs/00000.adx` matches Sound.afs in any folder
+
+This allows precise targeting of files inside archives without requiring full absolute paths.
+
+##### Emulator Chaining
+
+Emulators can operate on files inside other emulated files. For example:
+
+```
+FileEmulationFramework/
+  ONE/
+    textures.one/
+      textures.txd          ← Inject textures.txd into textures.one archive
+  TXD/
+    textures.txd/
+      texture_001.dds       ← Inject texture into textures.txd (which is inside .one)
+```
+
+When the game opens `textures.one`, the ONE emulator emulates it. When it reads `textures.txd` from inside, the TXD emulator emulates that. Routes compose naturally through the path hierarchy. i.e. The system works recursively.
+
+!!! info "TODO: Document Emulator Chaining/Nesting without Dummy Files"
+
+    There's some solution in use today, I forgot the details.
 
 #### Example Extension: Nx2VFS
 
@@ -81,12 +130,71 @@ and Layer 2 will handle all of the interactions with the operating system for th
 
 In this case, Nx2VFS would call Layer 2's `RegisterVirtualFile()` for each file contained in the original `.nx2` archive. And a `fileHandler` implementation to fill in the actual data.
 
+**How Nx2VFS Works:**
 
-### Layer Interaction
+```
+Archive on Disk:                    What Games See:
+┌──────────────────┐                ┌──────────────────────────┐
+│  game.nx2        │  Nx2VFS        │  game/                   │
+│  ├─ player.model │ ──────────────▶│  ├─ player.model         │
+│  ├─ enemy.model  │  registers     │  ├─ enemy.model          │
+│  └─ level.map    │  each file     │  └─ level.map            │
+└──────────────────┘                └──────────────────────────┘
+    (compressed)                    (appear as normal files)
+```
+
+**Creating Virtual Files:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Nx2VFS Extension (Layer 3)                                      │
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          │ 1. Parse game.nx2
+                          │    Discover: player.model, enemy.model, level.map
+                          ▼
+        ┌─────────────────────────────────────────┐
+        │ For each file in archive:               │
+        │                                         │
+        │  RegisterVirtualFile(                   │
+        │    path:        "game/player.model"     │
+        │    metadata:    {size: 1024, ...}       │
+        │    fileHandler: Nx2FileHandler          │
+        │  )                                      │
+        └─────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 2: Virtual File Framework                                 │
+│ • Stores fileHandler reference                                  │
+│ • Calls Layer 1's RegisterVirtualFile(path, metadata)           │
+└─────────────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Layer 1: Virtual FileSystem                                     │
+│ • Adds "game/player.model" to virtual file registry             │
+│ • Files now appear in directory listings                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Resolving Reads:**
+
+```
+When game opens 'game/player.model':
+  1. Layer 2 intercepts the read (NtReadFile)
+  2. Layer 2 calls Nx2VFS's fileHandler
+  3. fileHandler locates data inside game.nx2
+  4. fileHandler decompresses and returns data
+  5. Layer 2 passes data back to game
+```
+
+## Hook Endpoints
 
 Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
 
-??? question "Why ntdll.dll specifically?"
+!!! question "Why ntdll.dll specifically?"
+
     `ntdll.dll` is the lowest-level user-mode library on Windows, sitting directly above the kernel. All higher-level file I/O APIs funnel through these ntdll functions:
     
     - Win32 APIs (`CreateFileW`, `ReadFile`) → `kernel32.dll` → `ntdll.dll`
@@ -97,101 +205,163 @@ Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
     
     This single interception point also works with Wine on Linux, since `Wine` aims to implement Win32 as closely as possible; and that includes its relationship between `kernel32.dll` and `ntdll.dll`.
 
-Layer 2 depends on Layer 1's API but not vice versa:
-
-- **Layer 1** hooks path/metadata operations (`NtOpenFile`, `NtQueryDirectoryFile`, `NtQueryAttributesFile`, etc.)
-- **Layer 2** hooks data operations (`NtReadFile`, `NtSetInformationFile`, etc.) and calls Layer 1's `RegisterVirtualFile()` API
-- Applications remain completely unaware of both layers
-
-**Layer 1 Only (Path Redirection & Virtual Files):**
-
-**Path Redirection:**
 
 ```mermaid
-flowchart TB
-    App1[Application]
-    L1a[Layer 1: Virtual FileSystem]
-    OS1[Operating System]
+flowchart LR
+    subgraph Win32
 
-    App1 -->|Open file A| L1a
-    L1a -->|Redirect to file B<br/>Return file B handle| OS1
+    %% Definitions
+    FindFirstFileA
+    FindFirstFileExA
+    FindFirstFileW
+    FindFirstFileExW
+    FindFirstFileExFromAppW
+    FindNextFileA
+    FindNextFileW
+
+    CreateDirectoryA
+    CreateDirectoryW
+    CreateFileA
+    CreateFileW
+    CreateFile2
+    CreateFile2FromAppW
+    CreateFileFromAppW
+    CreateDirectoryExW
+    CreateDirectoryFromAppW
+    DeleteFileA
+    DeleteFileW
+    DeleteFileFromAppW
+    GetCompressedFileSizeA
+    GetCompressedFileSizeW
+    CloseHandle
+
+    GetFileAttributesA
+    GetFileAttributesExA
+    GetFileAttributesExFromAppW
+    GetFileAttributesExW
+    GetFileAttributesW
+    SetFileAttributesA
+    SetFileAttributesFromAppW
+    SetFileAttributesW
+
+    RemoveDirectoryA
+    RemoveDirectoryFromAppW
+    RemoveDirectoryW
+
+    %%% Win32 Internal Redirects
+    FindFirstFileA --> FindFirstFileExW
+    FindFirstFileExA --> FindFirstFileExW
+    FindFirstFileExFromAppW --> FindFirstFileExW
+    FindNextFileA --> FindNextFileW
+    CreateDirectoryA --> CreateDirectoryW
+    CreateFile2FromAppW --> CreateFile2
+    CreateDirectoryFromAppW --> CreateDirectoryExW
+    CreateFileFromAppW --> CreateFile2FromAppW
+    DeleteFileFromAppW --> DeleteFileW
+    DeleteFileA --> DeleteFileW
+    GetCompressedFileSizeA --> GetCompressedFileSizeW
+    GetFileAttributesA --> GetFileAttributesW
+    GetFileAttributesExA --> GetFileAttributesExW
+    GetFileAttributesExFromAppW --> GetFileAttributesExW
+    RemoveDirectoryA --> RemoveDirectoryW
+    RemoveDirectoryFromAppW --> RemoveDirectoryW
+    SetFileAttributesFromAppW --> SetFileAttributesW
+    SetFileAttributesA --> SetFileAttributesW
+    end
+
+    subgraph NT API
+    %% Definitions
+    NtCreateFile
+    NtOpenFile
+    NtQueryDirectoryFile
+    NtQueryDirectoryFileEx
+    NtDeleteFile
+    NtQueryAttributesFile
+    NtQueryFullAttributesFile
+    NtClose
+
+    %%% Win32 -> NT API
+    FindFirstFileExW --> NtOpenFile
+    FindFirstFileExW --> NtQueryDirectoryFileEx
+    FindFirstFileW --> NtOpenFile
+    FindFirstFileW --> NtQueryDirectoryFileEx
+    FindNextFileW --> NtQueryDirectoryFileEx
+    CreateFileA --> NtCreateFile
+    CreateFileW --> NtCreateFile
+    CreateFile2 --> NtCreateFile
+    CreateDirectoryW --> NtCreateFile
+    CreateDirectoryExW --> NtOpenFile
+    CreateDirectoryExW --> NtCreateFile
+    DeleteFileW --> NtOpenFile
+    RemoveDirectoryW --> NtOpenFile
+    GetCompressedFileSizeW --> NtOpenFile
+    CloseHandle --> NtClose
+    GetFileAttributesExW --> NtQueryFullAttributesFile
+    GetFileAttributesW --> NtQueryAttributesFile
+    SetFileAttributesW --> NtOpenFile
+    end
+
+    %%% Hooks
+    subgraph Hooks
+    NtCreateFile_Hook
+    NtOpenFile_Hook
+    NtQueryDirectoryFileEx_Hook
+    NtDeleteFile_Hook
+    NtQueryAttributesFile_Hook
+    NtQueryFullAttributesFile_Hook
+    NtClose_Hook
+
+    %% NT API -> Hooks
+    NtCreateFile --> NtCreateFile_Hook
+    NtOpenFile --> NtOpenFile_Hook
+    NtQueryDirectoryFileEx --> NtQueryDirectoryFileEx_Hook
+    NtQueryDirectoryFile --> NtQueryDirectoryFile_Hook
+
+    NtDeleteFile --> NtDeleteFile_Hook
+    NtQueryAttributesFile --> NtQueryAttributesFile_Hook
+    NtQueryFullAttributesFile --> NtQueryFullAttributesFile_Hook
+    NtClose --> NtClose_Hook
+    end
 ```
 
-**Virtual File Injection:**
+!!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
-```mermaid
-flowchart TB
-    App2[Application]
-    L1b[Layer 1: Virtual FileSystem]
-    OS2[Operating System]
+    In the VFS we would hook both, and detect if one recurses to the other using a semaphore. If we're recursing from `NtQueryDirectoryFile` to `NtQueryDirectoryFileEx`, we skip the hook code.
 
-    App2 -->|Search directory| L1b
-    L1b -->|Query directory| OS2
-    OS2 -->|Return real files| L1b
-    L1b -->|Inject virtual files<br/>Return modified results| App2
-```
+!!! info "This currently only contains information for Windows."
 
-**Layer 1 + Layer 2 (Data Synthesis & Virtual Files):**
+    Native support for other OSes will be added in the future.
 
-```mermaid
-flowchart TB
-    App[Application]
-    L2[Layer 2: File Emulation Framework]
-    L1[Layer 1: Virtual FileSystem]
-    OS[Operating System]
+!!! warning "TODO: GetFinalPathNameByHandleW"
 
-    App -->|Open emulated file| L2
-    L2 -->|RegisterVirtualFile<br/>Create virtual file entry| L1
-    L1 -->|Make file visible<br/>in directory searches| OS
-    
-    App -->|Read from file| L2
-    L2 -->|Emulator synthesizes data<br/>from multiple sources| L1
-    L1 -->|Access source files| OS
-```
+    I didn't add this function to the flowchart yet.
 
----
+    But basically it's Kernel32 GetFinalPathNameByHandleW -> NTDLL NtQueryObject and NtQueryInformationFile
 
-## Layer 1: Virtual FileSystem
+    I wrote some [more details here](https://github.com/ModOrganizer2/modorganizer/issues/2039#issuecomment-2151221938)
 
-### What It Does
+### Layer 1: Virtual FileSystem
 
-Intercepts file open operations to redirect path A → path B.  
-Intercepts directory query operations to inject virtual file entries into search results.
+!!! info "Reminder: [Layer 1 deals with the 'where' problem](#layer-1-virtual-filesystem)"
 
-When an application tries to open `game/data.pak`, Layer 1 can transparently open `mods/mymod/data.pak` instead. The application receives a handle to the substituted file with no awareness of the redirection.
+- **`NtCreateFile`** & **`NtOpenFile`**
+    - Intercept file creation/open operations. 
+      - Check if path should be redirected when creating new files.
+      - Substitute with target path before calling original API.
+    - For 'virtual files', spoof creation to succeed without touching disk.
 
-### Hooked APIs
+- **`NtQueryDirectoryFile`** & **`NtQueryDirectoryFileEx`**
+    - Inject virtual files into directory search results. 
+      - When application searches a directory, inject registered virtual files into the result set.
+    - Uses semaphore to avoid recursion between the two APIs on Windows 10+.
 
-- **`NtCreateFile`** - Intercept file creation operations. Check if path should be redirected when creating new files. Substitute with target path before calling original API.
-
-- **`NtOpenFile`** - Intercept file open operations. Check if path should be redirected when opening existing files. Substitute with target path before calling original API.
-
-- **`NtQueryDirectoryFile`** - Inject virtual files into directory search results (pre-Windows 10 / Wine). When application searches a directory, inject registered virtual files into the result set.
-
-- **`NtQueryDirectoryFileEx`** - Inject virtual files into directory search results (Windows 10+). On Windows 10+, this is the primary API. Both APIs are hooked with recursion detection.
-
-- **`NtQueryAttributesFile`** - Return metadata for virtual/redirected files. When application queries basic file attributes, return data for the redirected or virtual file.
-
-- **`NtQueryFullAttributesFile`** - Return full metadata for virtual/redirected files. When application queries extended file attributes (size, timestamps, etc.), return data for the redirected or virtual file.
-
-- **`NtDeleteFile`** - Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
+- **`NtQueryAttributesFile`** && **`NtQueryFullAttributesFile`** - Return metadata for virtual/redirected files.
 
 - **`NtClose`** - Track when file handles are closed. Used for internal handle lifecycle management.
 
-**[→ Complete Hook Flow Diagram](Virtual-FileSystem/Implementation-Details/Hooks.md)**
+If/when we implement write support, we would also hook APIs such as:
 
-### Implementation Notes
-
-- Uses **path tree structures** for efficient redirect lookup
-- Virtual files stored in **hash table** keyed by normalized path
-- All path comparisons are **case-insensitive** on Windows
-- Redirect priority: individual file redirects take precedence over folder redirects
-- Supports merging multiple source folders onto a single target (last registered wins for conflicts)
-- Works with Wine on Linux (all Win32 APIs funnel through ntdll)
-
-**[→ Full Implementation Details](Virtual-FileSystem/About.md)**
-
----
+- **`NtDeleteFile`** - Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
 
 ## Layer 2: File Emulation Framework
 
@@ -222,38 +392,6 @@ Uses Layer 1 to make emulated files visible in directory searches and to handle 
 - Calls `RegisterVirtualFile()` to make emulated files visible in directory listings
 - Leverages Layer 1's redirect system for route-based file targeting
 - Layer 1 handles the path redirection; Layer 2 handles the data synthesis
-
-### Route System
-
-Files are identified by their full path including archive nesting:
-
-```
-<GameFolder>/English/Sound.afs/00000.adx
-            └─ Archive ─┘ └─ File Inside ─┘
-```
-
-Emulators match against routes using partial path matching. A route pattern like `Sound.afs/00000.adx` matches any path ending with that pattern. More specific patterns take precedence:
-
-- `English/Sound.afs/00000.adx` matches only files in the English folder
-- `Sound.afs/00000.adx` matches Sound.afs in any folder
-
-This allows precise targeting of files inside archives without requiring full absolute paths.
-
-### Emulator Chaining
-
-Emulators can operate on files inside other emulated files. For example:
-
-```
-FileEmulationFramework/
-  ONE/
-    textures.one/
-      textures.txd          ← Inject textures.txd into textures.one archive
-  TXD/
-    textures.txd/
-      texture_001.dds       ← Inject texture into textures.txd (which is inside .one)
-```
-
-When the game opens `textures.one`, the ONE emulator emulates it. When it reads `textures.txd` from inside, the TXD emulator emulates that. Routes compose naturally through the path hierarchy.
 
 ### Data Structures
 
@@ -325,17 +463,19 @@ This documentation iterates and improves upon two major implementations:
 
 ### Key Architectural Difference
 
-**Emulated File Generation: Access Time vs Up Front**
+**Separation of Archive Emulation and Virtual Files**
 
-In Reloaded-II, emulated files were created **at access time** (lazy initialization). This is because, at the time the original `FileEmulationFramework` was written, the primary use case was replacing original game files (e.g. archives) with emulated versions when the game accessed them. 
+Reloaded-II's `FileEmulationFramework` was originally designed for **archive replacement** - creating emulated archives lazily when accessed to avoid generating massive files up front.
 
-!!! example "Example: Replace 60GB archive with new 60GB archive, without using disk space."
+!!! example "Original Use Case"
+    Replace a 60GB game archive with an emulated version, without using disk space.
 
-Over time, a need emerged for artificial emulated files; ones not tied to any original game file. (Think making an extra file and appending it to a list of files game would load).
+Over time, new requirements emerged: **NxVFS** integration and **synthesizing arbitrary files** (e.g., adding files to a game's load list). This created architectural inconsistency - some files lazy, others up front - and unnecessary coupling between archive emulation and virtual file management.
 
-APIs were added to support this, but it introduced a situation where some files were created lazily, while others were created up front. 
+**The new solution**: Split these as separate concerns. The VFS generates all emulated files **up front** during registration, while archive emulation is handled distinctly when needed. This provides predictable state, reduced overhead at file open time, and cleaner architecture. The marginal memory savings from lazy initialization weren't worth the complexity.
 
-The current design (Reloaded3) generates **all emulated files up front** rather than at access time. What this means in the context of a 
+### Other Differences
 
-
-This simplification reduces overhead at file open time, makes the virtual filesystem state predictable through an explicit registration phase, and provides better performance characteristics for bulk operations. The trade-off of marginal memory savings for lazy initialization wasn't worth the implementation complexity in production use.
+- Added support for Memory Maps.
+- Added missing NtOpenFile API. (& other related miscellany)
+- APIs use handles to unregister/dispose.

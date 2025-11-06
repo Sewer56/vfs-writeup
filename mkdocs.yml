@@ -75,7 +75,6 @@ nav:
       - Behaviours & Limitations: Virtual-FileSystem/Behaviours-Limitations.md
       - Performance: Virtual-FileSystem/Performance.md
       - Implementation Details:
-          - Hooks: Virtual-FileSystem/Implementation-Details/Hooks.md
           - Trees: Virtual-FileSystem/Implementation-Details/Trees.md
           - Optimizations: Virtual-FileSystem/Implementation-Details/Optimizations.md
   - File Emulation Framework:
@@ -91,6 +90,6 @@ nav:
           - Cookbook: File-Emulation-Framework/Emulator-Development/Emulator-Cookbook.md
       - Implementation Details:
           - Hooks: File-Emulation-Framework/Implementation-Details/Hooks.md
-  - Plugins:
-      - Nx2VFS: Plugins/Nx2VFS.md
-      - Archive Emulation Framework: Plugins/Archive-Emulation-Framework.md
+  #- Plugins:
+  #    - Nx2VFS: Plugins/Nx2VFS.md
+  #    - Archive Emulation Framework: Plugins/Archive-Emulation-Framework.md
