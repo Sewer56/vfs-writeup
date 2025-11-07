@@ -241,9 +241,12 @@ flowchart LR
     CreateFileFromAppW
     CreateDirectoryExW
     CreateDirectoryFromAppW
+    DeleteFile2A
+    DeleteFile2W
     DeleteFileA
     DeleteFileW
     DeleteFileFromAppW
+    InternalDeleteFileW
     GetCompressedFileSizeA
     GetCompressedFileSizeW
     CloseHandle
@@ -286,8 +289,11 @@ flowchart LR
     CreateFile2FromAppW --> CreateFile2
     CreateDirectoryFromAppW --> CreateDirectoryW
     CreateFileFromAppW --> CreateFile2FromAppW
+    DeleteFile2A --> InternalDeleteFileW
+    DeleteFile2W --> InternalDeleteFileW
     DeleteFileFromAppW --> DeleteFileW
     DeleteFileA --> DeleteFileW
+    DeleteFileW --> InternalDeleteFileW
     GetCompressedFileSizeA --> GetCompressedFileSizeW
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
@@ -331,7 +337,9 @@ flowchart LR
     CreateDirectoryExW --> NtQueryInformationFile
     CreateDirectoryExW --> NtCreateFile
     CreateDirectoryExW --> NtSetInformationFile
-    DeleteFileW --> NtOpenFile
+    InternalDeleteFileW --> NtOpenFile
+    InternalDeleteFileW --> NtQueryInformationFile
+    InternalDeleteFileW --> NtSetInformationFile
     RemoveDirectoryW --> NtOpenFile
     GetCompressedFileSizeW --> NtOpenFile
     CloseHandle --> NtClose
@@ -375,7 +383,7 @@ flowchart LR
 
 ??? note "Roots (as of Windows 11 25H2)"
 
-    [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) is also a good resource.
+    [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) and [Winbase.h](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createdirectorytransacteda) is also a good resource.
 
     KernelBase.dll (Files):
     - ✅ `CreateDirectory2A`
@@ -391,15 +399,27 @@ flowchart LR
     - ✅ `CreateFileFromAppW`
     - ✅ `CreateFileW`
 
+    KernelBase.dll (No-op):
+    - `FindClose` -> `NtClose`
+
     KernelBase.dll (Memory Mapping):
     - ✅ `CreateFileMapping2`
     - ✅ `CreateFileMappingFromApp`
     - ✅ `CreateFileMappingNumaW`
     - ✅ `CreateFileMappingW`
   
-    - KernelBase.dll (Links / Write):
+    KernelBase.dll (Links / Write):
     - ✅ `CreateHardLinkA`
     - ✅ `CreateHardLinkW`
+    - ✅ `DeleteFile2A`
+    - ✅ `DeleteFile2W`
+    - ✅ `DeleteFileA`
+    - ✅ `DeleteFileW`
+    - ✅ `DeleteFileFromAppW`
+    - ✅ `InternalDeleteFileW`
+  
+    Transactional NTFS (Deprecated):
+    - ✅ CreateDirectoryTransactedA
 
     KernelBase.dll (UWP - uses another process - not investigated):
     - BrokeredCreateDirectoryW
