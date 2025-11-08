@@ -385,6 +385,10 @@ flowchart LR
     GetFileInformationByHandle
     GetFileInformationByHandleEx
     GetFileInformationByName
+    GetFileSize
+    GetFileSizeEx
+    GetFileTime
+    GetFileType
 
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
@@ -411,12 +415,20 @@ flowchart LR
     GetFileInformationByHandleEx --> NtQueryInformationFile
     GetFileInformationByHandleEx --> NtQueryVolumeInformationFile
     GetFileInformationByName --> NtQueryInformationByName
+    GetFileSize --> NtQueryInformationFile
+    GetFileSizeEx --> NtQueryInformationFile
+    GetFileTime --> NtQueryInformationFile
+    GetFileType --> NtQueryVolumeInformationFile
     end
 ```
 
 !!! info "NtQueryVolumeInformationFile does not need emulation"
 
     `NtQueryVolumeInformationFile` queries volume-level information (filesystem type, serial number, etc.) rather than individual file metadata. Since we're not virtualizing entire volumes, this API can pass through without interception.
+
+!!! info "GetFileVersion* APIs"
+
+    `GetFileVersionInfoA`, `GetFileVersionInfoW`, `GetFileVersionInfoExA`, `GetFileVersionInfoExW`, and related APIs extract embedded version resources from PE files. These are handled by the standard file read/open APIs (`NtCreateFile`, `NtReadFile`) and don't require separate hooking.
 
 ### File Copy Operations
 
@@ -633,6 +645,10 @@ flowchart LR
     - ✅ `GetFileInformationByHandle`
     - ✅ `GetFileInformationByHandleEx`
     - ✅ `GetFileInformationByName`
+    - ✅ `GetFileSize`
+    - ✅ `GetFileSizeEx`
+    - ✅ `GetFileTime`
+    - ✅ `GetFileType`
 
     KernelBase.dll (Memory Mapping):
 
