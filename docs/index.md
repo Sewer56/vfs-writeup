@@ -373,7 +373,7 @@ flowchart LR
 
 ### Read/Write Operations
 
-All file read and write operations funnel through NT-level read/write APIs.
+All file read and write operations, including file size modification, funnel through NT-level read/write APIs.
 
 ```mermaid
 flowchart LR
@@ -381,16 +381,21 @@ flowchart LR
     ReadFile
     ReadFileEx
     ReadFileScatter
+    SetEndOfFile
 
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtReadFile
     NtReadFileScatter
+    NtQueryInformationFile
+    NtSetInformationFile
 
     ReadFile --> NtReadFile
     ReadFileEx --> NtReadFile
     ReadFileScatter --> NtReadFileScatter
+    SetEndOfFile --> NtQueryInformationFile
+    SetEndOfFile --> NtSetInformationFile
     end
 ```
 
@@ -694,6 +699,7 @@ flowchart LR
     - ✅ `ReadFile`
     - ✅ `ReadFileEx`
     - ✅ `ReadFileScatter`
+    - ✅ `SetEndOfFile`
 
     KernelBase.dll (Memory Mapping):
 
