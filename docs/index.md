@@ -373,7 +373,7 @@ flowchart LR
 
 ### Read/Write Operations
 
-All file read and write operations, including file size modification, funnel through NT-level read/write APIs.
+All file read and write operations, including file pointer positioning and file size modification, funnel through NT-level read/write APIs.
 
 ```mermaid
 flowchart LR
@@ -381,6 +381,8 @@ flowchart LR
     ReadFile
     ReadFileEx
     ReadFileScatter
+    SetFilePointer
+    SetFilePointerEx
     SetEndOfFile
 
     end
@@ -394,6 +396,10 @@ flowchart LR
     ReadFile --> NtReadFile
     ReadFileEx --> NtReadFile
     ReadFileScatter --> NtReadFileScatter
+    SetFilePointer --> NtQueryInformationFile
+    SetFilePointer --> NtSetInformationFile
+    SetFilePointerEx --> NtQueryInformationFile
+    SetFilePointerEx --> NtSetInformationFile
     SetEndOfFile --> NtQueryInformationFile
     SetEndOfFile --> NtSetInformationFile
     end
