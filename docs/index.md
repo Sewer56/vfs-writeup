@@ -338,6 +338,8 @@ flowchart LR
     DeleteFileW
     DeleteFileFromAppW
     InternalDeleteFileW
+    RemoveDirectory2A
+    RemoveDirectory2W
     RemoveDirectoryA
     RemoveDirectoryFromAppW
     RemoveDirectoryW
@@ -348,6 +350,8 @@ flowchart LR
     DeleteFileFromAppW --> DeleteFileW
     DeleteFileA --> DeleteFileW
     DeleteFileW --> InternalDeleteFileW
+    RemoveDirectory2A --> InternalRemoveDirectoryW
+    RemoveDirectory2W --> InternalRemoveDirectoryW
     RemoveDirectoryA --> RemoveDirectoryW
     RemoveDirectoryFromAppW --> RemoveDirectoryW
     RemoveDirectoryW --> InternalRemoveDirectoryW
@@ -727,6 +731,8 @@ flowchart LR
     - ✅ `DeleteFileW`
     - ✅ `DeleteFileFromAppW`
     - ✅ `InternalDeleteFileW`
+    - ✅ `RemoveDirectory2A`
+    - ✅ `RemoveDirectory2W`
     - ✅ `RemoveDirectoryA`
     - ✅ `RemoveDirectoryW`
     - ✅ `RemoveDirectoryFromAppW`
