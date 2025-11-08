@@ -229,6 +229,8 @@ flowchart LR
     FindFirstFileW
     FindFirstFileExW
     FindFirstFileExFromAppW
+    FindFirstFileTransactedA
+    FindFirstFileTransactedW
     InternalFindFirstFileExW
     InternalFindFirstFileW
     FindNextFileA
@@ -239,6 +241,8 @@ flowchart LR
     FindFirstFileExFromAppW --> FindFirstFileExW
     FindFirstFileExW --> InternalFindFirstFileExW
     FindFirstFileW --> InternalFindFirstFileW
+    FindFirstFileTransactedA --> FindFirstFileExA
+    FindFirstFileTransactedW --> FindFirstFileExW
     FindNextFileA --> FindNextFileW
     end
 
@@ -524,12 +528,16 @@ Additional file operations including stream enumeration, file name enumeration, 
 flowchart LR
     subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
     FindFirstFileNameW
+    FindNextFileNameW
+    FindParent
     FindFirstStreamW
+    FindNextStreamW
     GetCompressedFileSizeA
     GetCompressedFileSizeW
     CloseHandle
 
     GetCompressedFileSizeA --> GetCompressedFileSizeW
+    FindNextFileNameW --> FindParent
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -540,9 +548,11 @@ flowchart LR
 
     FindFirstFileNameW --> NtCreateFile
     FindFirstFileNameW --> NtQueryInformationFile
+    FindParent --> NtCreateFile
     FindFirstStreamW --> NtCreateFile
     FindFirstStreamW --> NtQueryInformationFile
     GetCompressedFileSizeW --> NtOpenFile
+    GetCompressedFileSizeW --> NtQueryInformationFile
     CloseHandle --> NtClose
     end
 ```
@@ -564,11 +574,16 @@ flowchart LR
         FindFirstFileExW
         FindFirstFileExFromAppW
         FindFirstFileNameW
+        FindNextFileNameW
+        FindParent
         InternalFindFirstFileExW
         InternalFindFirstFileW
         FindNextFileA
         FindNextFileW
         FindFirstStreamW
+        FindNextStreamW
+        FindFirstFileTransactedA
+        FindFirstFileTransactedW
 
         FindFirstChangeNotificationA
         FindFirstChangeNotificationW
@@ -647,6 +662,8 @@ flowchart LR
         FindFirstFileExW --> InternalFindFirstFileExW
         FindFirstFileW --> InternalFindFirstFileW
         FindNextFileA --> FindNextFileW
+        FindFirstFileTransactedA --> FindFirstFileExA
+        FindFirstFileTransactedW --> FindFirstFileExW
         FindFirstChangeNotificationA --> FindFirstChangeNotificationW
         CreateDirectory2A --> InternalCreateDirectoryW
         CreateDirectory2W --> InternalCreateDirectoryW
@@ -719,6 +736,8 @@ flowchart LR
         FindNextFileW --> NtQueryDirectoryFileEx
         FindFirstFileNameW --> NtCreateFile
         FindFirstFileNameW --> NtQueryInformationFile
+        FindNextFileNameW --> FindParent
+        FindParent --> NtCreateFile
         FindFirstStreamW --> NtCreateFile
         FindFirstStreamW --> NtQueryInformationFile
         FindFirstChangeNotificationW --> NtOpenFile
@@ -740,6 +759,7 @@ flowchart LR
         InternalDeleteFileW --> NtSetInformationFile
         RemoveDirectoryW --> NtOpenFile
         GetCompressedFileSizeW --> NtOpenFile
+        GetCompressedFileSizeW --> NtQueryInformationFile
         CloseHandle --> NtClose
         CreateFileMapping2 --> NtCreateSectionEx
         CreateFileMappingNumaW --> NtCreateSection
@@ -763,6 +783,7 @@ flowchart LR
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
     - `DecryptFileA` / `DecryptFileW` / `EncryptFileA` / `EncryptFileW` / `FileEncryptionStatusA` / `FileEncryptionStatusW` - Not supported with any game store, or even legacy games.
     - ✅ `FindFirstStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
+    - ✅ `FindNextStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
     - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
 
 ??? note "Roots (as of Windows 11 25H2)"
@@ -792,6 +813,7 @@ flowchart LR
     - ✅ `FindFirstFileExW`
     - ✅ `FindFirstFileExFromAppW`
     - ✅ `FindFirstFileNameW`
+    - ✅ `FindNextFileNameW`
     - ✅ `InternalFindFirstFileExW`
     - ✅ `InternalFindFirstFileW`
 
@@ -850,6 +872,8 @@ flowchart LR
     - ✅ `CreateFileTransactedW`
     - ✅ `CreateSymbolicLinkTransactedA`
     - ✅ `CreateSymbolicLinkTransactedW`
+    - ✅ `FindFirstFileTransactedA`
+    - ✅ `FindFirstFileTransactedW`
 
     KernelBase.dll (UWP - uses another process - not investigated):
 
