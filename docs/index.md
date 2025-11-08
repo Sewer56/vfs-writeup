@@ -226,6 +226,9 @@ flowchart LR
     FindNextFileA
     FindNextFileW
 
+    FindFirstChangeNotificationA
+    FindFirstChangeNotificationW
+
     CreateDirectory2A
     CreateDirectory2W
     CreateDirectoryA
@@ -297,6 +300,7 @@ flowchart LR
     FindFirstFileExA --> FindFirstFileExW
     FindFirstFileExFromAppW --> FindFirstFileExW
     FindNextFileA --> FindNextFileW
+    FindFirstChangeNotificationA --> FindFirstChangeNotificationW
     CreateDirectory2A --> InternalCreateDirectoryW
     CreateDirectory2W --> InternalCreateDirectoryW
     CreateDirectoryA --> CreateDirectoryW
@@ -354,6 +358,7 @@ flowchart LR
     NtQueryFullAttributesFile
     NtQueryInformationFile
     NtSetInformationFile
+    NtNotifyChangeDirectoryFile
     NtCreateSection
     NtCreateSectionEx
     NtClose
@@ -364,6 +369,8 @@ flowchart LR
     FindFirstFileW --> NtOpenFile
     FindFirstFileW --> NtQueryDirectoryFileEx
     FindNextFileW --> NtQueryDirectoryFileEx
+    FindFirstChangeNotificationW --> NtOpenFile
+    FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
     CreateFileInternal --> NtCreateFile
     CreateFileInternal --> NtSetInformationFile
     CreateFileInternal --> NtQueryInformationFile
@@ -447,6 +454,11 @@ flowchart LR
     KernelBase.dll (No-op):
 
     - `FindClose` -> `NtClose`
+
+    KernelBase.dll (Change Notification):
+
+    - ✅ `FindFirstChangeNotificationA`
+    - ✅ `FindFirstChangeNotificationW`
 
     KernelBase.dll (Memory Mapping):
 
