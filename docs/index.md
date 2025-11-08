@@ -232,6 +232,7 @@ flowchart LR
 
     FindFirstChangeNotificationA
     FindFirstChangeNotificationW
+    FindNextChangeNotification
 
     CreateDirectory2A
     CreateDirectory2W
@@ -365,6 +366,7 @@ flowchart LR
     NtQueryInformationFile
     NtSetInformationFile
     NtNotifyChangeDirectoryFile
+    NtNotifyChangeDirectoryFileEx
     NtCreateSection
     NtCreateSectionEx
     NtClose
@@ -381,6 +383,8 @@ flowchart LR
     FindFirstStreamW --> NtQueryInformationFile
     FindFirstChangeNotificationW --> NtOpenFile
     FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
+    FindNextChangeNotification --> NtNotifyChangeDirectoryFile
+    NtNotifyChangeDirectoryFile --> NtNotifyChangeDirectoryFileEx
     CreateFileInternal --> NtCreateFile
     CreateFileInternal --> NtSetInformationFile
     CreateFileInternal --> NtQueryInformationFile
@@ -410,28 +414,6 @@ flowchart LR
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     SetFileAttributesW --> NtOpenFile
-    end
-
-    %%% Hooks
-    subgraph Hooks
-    NtCreateFile_Hook
-    NtOpenFile_Hook
-    NtQueryDirectoryFileEx_Hook
-    NtDeleteFile_Hook
-    NtQueryAttributesFile_Hook
-    NtQueryFullAttributesFile_Hook
-    NtClose_Hook
-
-    %% NT API -> Hooks
-    NtCreateFile --> NtCreateFile_Hook
-    NtOpenFile --> NtOpenFile_Hook
-    NtQueryDirectoryFileEx --> NtQueryDirectoryFileEx_Hook
-    NtQueryDirectoryFile --> NtQueryDirectoryFile_Hook
-
-    NtDeleteFile --> NtDeleteFile_Hook
-    NtQueryAttributesFile --> NtQueryAttributesFile_Hook
-    NtQueryFullAttributesFile --> NtQueryFullAttributesFile_Hook
-    NtClose --> NtClose_Hook
     end
 ```
 
@@ -481,6 +463,7 @@ flowchart LR
 
     - ✅ `FindFirstChangeNotificationA`
     - ✅ `FindFirstChangeNotificationW`
+    - ✅ `FindNextChangeNotification`
 
     KernelBase.dll (Memory Mapping):
 
@@ -538,7 +521,11 @@ flowchart LR
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
-    In the VFS we would hook both, and detect if one recurses to the other using a semaphore. If we're recursing from `NtQueryDirectoryFile` to `NtQueryDirectoryFileEx`, we skip the hook code.
+    In the VFS we would hook both APIs, and detect if one recurses to the other using a semaphore. If we're recursing from `NtQueryDirectoryFile` to `NtQueryDirectoryFileEx`, we skip the hook code.
+    
+    **`NtNotifyChangeDirectoryFileEx`:** Conversely, `NtNotifyChangeDirectoryFile` wraps `NtNotifyChangeDirectoryFileEx` on modern Windows versions. I have not verified which version made this change.
+    
+    **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behavior.
 
 !!! info "This currently only contains information for Windows."
 
