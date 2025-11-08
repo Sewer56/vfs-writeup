@@ -389,12 +389,15 @@ flowchart LR
     GetFileSizeEx
     GetFileTime
     GetFileType
+    GetFinalPathNameByHandleA
+    GetFinalPathNameByHandleW
 
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
     GetFileAttributesExFromAppW --> GetFileAttributesExW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesA --> SetFileAttributesW
+    GetFinalPathNameByHandleA --> GetFinalPathNameByHandleW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -404,6 +407,7 @@ flowchart LR
     NtQueryInformationByName
     NtQueryVolumeInformationFile
     NtQueryDirectoryFile
+    NtQueryObject
     NtOpenFile
 
     GetFileAttributesExW --> NtQueryFullAttributesFile
@@ -419,6 +423,8 @@ flowchart LR
     GetFileSizeEx --> NtQueryInformationFile
     GetFileTime --> NtQueryInformationFile
     GetFileType --> NtQueryVolumeInformationFile
+    GetFinalPathNameByHandleW --> NtQueryObject
+    GetFinalPathNameByHandleW --> NtQueryInformationFile
     end
 ```
 
@@ -649,6 +655,8 @@ flowchart LR
     - ✅ `GetFileSizeEx`
     - ✅ `GetFileTime`
     - ✅ `GetFileType`
+    - ✅ `GetFinalPathNameByHandleA`
+    - ✅ `GetFinalPathNameByHandleW`
 
     KernelBase.dll (Memory Mapping):
 
@@ -721,14 +729,6 @@ flowchart LR
 !!! info "This currently only contains information for Windows."
 
     Native support for other OSes will be added in the future.
-
-!!! warning "TODO: GetFinalPathNameByHandleW"
-
-    I didn't add this function to the flowchart yet.
-
-    But basically it's Kernel32 GetFinalPathNameByHandleW -> NTDLL NtQueryObject and NtQueryInformationFile
-
-    I wrote some [more details here](https://github.com/ModOrganizer2/modorganizer/issues/2039#issuecomment-2151221938)
 
 ### Layer 1: Virtual FileSystem
 
