@@ -325,7 +325,7 @@ flowchart LR
 
 ### File & Directory Deletion
 
-All deletion APIs (`DeleteFile*` and `RemoveDirectory*`) converge through `InternalDeleteFileW` to NT-level operations.
+All deletion APIs (`DeleteFile*` and `RemoveDirectory*`) converge through internal functions (`InternalDeleteFileW` and `InternalRemoveDirectoryW`) to NT-level operations.
 
 ```mermaid
 flowchart LR
@@ -339,6 +339,7 @@ flowchart LR
     RemoveDirectoryA
     RemoveDirectoryFromAppW
     RemoveDirectoryW
+    InternalRemoveDirectoryW
 
     DeleteFile2A --> InternalDeleteFileW
     DeleteFile2W --> InternalDeleteFileW
@@ -347,6 +348,7 @@ flowchart LR
     DeleteFileW --> InternalDeleteFileW
     RemoveDirectoryA --> RemoveDirectoryW
     RemoveDirectoryFromAppW --> RemoveDirectoryW
+    RemoveDirectoryW --> InternalRemoveDirectoryW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -357,7 +359,9 @@ flowchart LR
     InternalDeleteFileW --> NtOpenFile
     InternalDeleteFileW --> NtQueryInformationFile
     InternalDeleteFileW --> NtSetInformationFile
-    RemoveDirectoryW --> NtOpenFile
+    InternalRemoveDirectoryW --> NtOpenFile
+    InternalRemoveDirectoryW --> NtQueryInformationFile
+    InternalRemoveDirectoryW --> NtSetInformationFile
     end
 ```
 
@@ -654,6 +658,7 @@ flowchart LR
         RemoveDirectoryA
         RemoveDirectoryFromAppW
         RemoveDirectoryW
+        InternalRemoveDirectoryW
 
         %%% Win32 Internal Redirects
         FindFirstFileA --> InternalFindFirstFileExW
@@ -693,6 +698,7 @@ flowchart LR
         GetFileAttributesExFromAppW --> GetFileAttributesExW
         RemoveDirectoryA --> RemoveDirectoryW
         RemoveDirectoryFromAppW --> RemoveDirectoryW
+        RemoveDirectoryW --> InternalRemoveDirectoryW
         SetFileAttributesFromAppW --> SetFileAttributesW
         SetFileAttributesA --> SetFileAttributesW
         CreateFileMappingNumaA --> CreateFileMappingNumaW
@@ -757,7 +763,9 @@ flowchart LR
         InternalDeleteFileW --> NtOpenFile
         InternalDeleteFileW --> NtQueryInformationFile
         InternalDeleteFileW --> NtSetInformationFile
-        RemoveDirectoryW --> NtOpenFile
+        InternalRemoveDirectoryW --> NtOpenFile
+        InternalRemoveDirectoryW --> NtQueryInformationFile
+        InternalRemoveDirectoryW --> NtSetInformationFile
         GetCompressedFileSizeW --> NtOpenFile
         GetCompressedFileSizeW --> NtQueryInformationFile
         CloseHandle --> NtClose
@@ -856,6 +864,10 @@ flowchart LR
     - ✅ `DeleteFileW`
     - ✅ `DeleteFileFromAppW`
     - ✅ `InternalDeleteFileW`
+    - ✅ `RemoveDirectoryA`
+    - ✅ `RemoveDirectoryW`
+    - ✅ `RemoveDirectoryFromAppW`
+    - ✅ `InternalRemoveDirectoryW`
   
     Transactional NTFS (Deprecated):
 
