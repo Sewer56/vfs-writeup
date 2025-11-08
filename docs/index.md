@@ -367,6 +367,29 @@ flowchart LR
     end
 ```
 
+### Read/Write Operations
+
+All file read and write operations funnel through NT-level read/write APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    ReadFile
+    ReadFileEx
+    ReadFileScatter
+
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtReadFile
+    NtReadFileScatter
+
+    ReadFile --> NtReadFile
+    ReadFileEx --> NtReadFile
+    ReadFileScatter --> NtReadFileScatter
+    end
+```
+
 ### File Attributes
 
 Query and modification of file attributes. Path-based queries use `GetFileAttributes*` and `SetFileAttributes*` APIs, handle-based queries use `GetFileInformationByHandle*` APIs, and name-based queries use `GetFileInformationByName`.
@@ -661,6 +684,12 @@ flowchart LR
     - ✅ `GetFileType`
     - ✅ `GetFinalPathNameByHandleA`
     - ✅ `GetFinalPathNameByHandleW`
+
+    KernelBase.dll (Read/Write Operations):
+
+    - ✅ `ReadFile`
+    - ✅ `ReadFileEx`
+    - ✅ `ReadFileScatter`
 
     KernelBase.dll (Memory Mapping):
 
