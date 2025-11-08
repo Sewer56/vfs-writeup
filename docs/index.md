@@ -676,17 +676,19 @@ flowchart LR
     - ✅ `FindFirstFileTransactedW`
 
 
-!!! info "About WinRT/UWP 'Brokered' Functions"
+!!! info "About WinRT/UWP 'Brokered' Functions (Windows 10 1803+)"
 
     Brokered calls are API calls that go through `RuntimeBroker.exe`, which acts as a security intermediary between UWP apps running in an AppContainer sandbox and system resources they need to access.
     
     The broker enforces capability-based security and permission checks.
 
-    APIs such as CreateFile2 support this out of the box, however, it is heavily restricted. You can only open files or directories inside `ApplicationData.LocalFolder` or `Package.InstalledLocation` directories.
+    There are 2 types of APIs supported for WinRT/UWP:
 
-    I have not investigated how this works, but it appears this is enforced in kernel, behind the `ntdll.dll` functions we're hooking, so we're okay.
-    
-    But chances are if we use VFS from UWP, it'll just error since it's not allowed to access the new file.
+    1. APIs such as `CreateFile2`. These are heavily restricted to only support `ApplicationData.LocalFolder` or `Package.InstalledLocation` directories. 
+    2. APIs such as `CreateFile2FromAppW` will first run e.g. `CreateFile2`, and if that fails, it will route through the 'broker', i.e. `BrokeredCreateFile2` in `ext-ms-win-winrt-storage-win32broker-;1-1-0.dll`.
+        - This would require an extra hook on a separate process.
+
+    I have not experimented, but based on code inspection, it'll redirect, then likely fail due to `ApplicationData.LocalFolder`/`Package.InstalledLocation` limitation, and then try routing through the broker (separate process).
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
