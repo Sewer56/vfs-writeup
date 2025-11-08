@@ -561,7 +561,7 @@ flowchart LR
 
 ### Miscellaneous APIs
 
-Additional file operations including stream enumeration, file name enumeration, compression info, and handle cleanup.
+Additional file operations including stream enumeration, file name enumeration, compression info, file locking, and handle cleanup.
 
 ```mermaid
 flowchart LR
@@ -573,6 +573,8 @@ flowchart LR
     FindNextStreamW
     GetCompressedFileSizeA
     GetCompressedFileSizeW
+    LockFile
+    LockFileEx
     CloseHandle
 
     GetCompressedFileSizeA --> GetCompressedFileSizeW
@@ -583,6 +585,7 @@ flowchart LR
     NtCreateFile
     NtQueryInformationFile
     NtOpenFile
+    NtLockFile
     NtClose
 
     FindFirstFileNameW --> NtCreateFile
@@ -592,6 +595,8 @@ flowchart LR
     FindFirstStreamW --> NtQueryInformationFile
     GetCompressedFileSizeW --> NtOpenFile
     GetCompressedFileSizeW --> NtQueryInformationFile
+    LockFile --> NtLockFile
+    LockFileEx --> NtLockFile
     CloseHandle --> NtClose
     end
 ```
@@ -666,6 +671,11 @@ flowchart LR
     - ✅ `CreateFileMappingNumaW`
     - ✅ `CreateFileMappingW`
   
+    KernelBase.dll (File Locking):
+
+    - ✅ `LockFile`
+    - ✅ `LockFileEx`
+
     KernelBase.dll (Copy):
 
     - ✅ `CopyFileA`
