@@ -423,6 +423,8 @@ flowchart LR
     GetFileSizeEx
     GetFileTime
     GetFileType
+    GetCompressedFileSizeA
+    GetCompressedFileSizeW
     GetFinalPathNameByHandleA
     GetFinalPathNameByHandleW
 
@@ -432,6 +434,7 @@ flowchart LR
     SetFileAttributesA --> SetFileAttributesW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesW --> InternalSetFileAttributesW
+    GetCompressedFileSizeA --> GetCompressedFileSizeW
     GetFinalPathNameByHandleA --> GetFinalPathNameByHandleW
     end
 
@@ -460,6 +463,8 @@ flowchart LR
     GetFileSizeEx --> NtQueryInformationFile
     GetFileTime --> NtQueryInformationFile
     GetFileType --> NtQueryVolumeInformationFile
+    GetCompressedFileSizeW --> NtOpenFile
+    GetCompressedFileSizeW --> NtQueryInformationFile
     GetFinalPathNameByHandleW --> NtQueryObject
     GetFinalPathNameByHandleW --> NtQueryInformationFile
     SetFileInformationByHandle --> NtSetInformationFile
@@ -469,6 +474,10 @@ flowchart LR
 !!! info "NtQueryVolumeInformationFile does not need emulation"
 
     `NtQueryVolumeInformationFile` queries volume-level information (filesystem type, serial number, etc.) rather than individual file metadata. Since we're not virtualizing entire volumes, this API can pass through without interception.
+
+!!! info "GetCompressedFileSize* APIs"
+
+    `GetCompressedFileSizeA` and `GetCompressedFileSizeW` query the on-disk size of NTFS compressed files (which differs from logical file size for compressed files). For virtual files, return the regular file size. For redirected files, simply redirect the path and let the underlying file system report its compressed size.
 
 !!! info "GetFileVersion* APIs"
 
@@ -607,33 +616,27 @@ flowchart LR
 
 ### Miscellaneous APIs
 
-Additional file operations including stream enumeration, compression info, file locking, and handle cleanup.
+Additional file operations including stream enumeration, file locking, and handle cleanup.
 
 ```mermaid
 flowchart LR
     subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
     FindFirstStreamW
     FindNextStreamW
-    GetCompressedFileSizeA
-    GetCompressedFileSizeW
     LockFile
     LockFileEx
     CloseHandle
 
-    GetCompressedFileSizeA --> GetCompressedFileSizeW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtCreateFile
     NtQueryInformationFile
-    NtOpenFile
     NtLockFile
     NtClose
 
     FindFirstStreamW --> NtCreateFile
     FindFirstStreamW --> NtQueryInformationFile
-    GetCompressedFileSizeW --> NtOpenFile
-    GetCompressedFileSizeW --> NtQueryInformationFile
     LockFile --> NtLockFile
     LockFileEx --> NtLockFile
     CloseHandle --> NtClose
