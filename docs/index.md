@@ -414,6 +414,7 @@ flowchart LR
     SetFileAttributesA
     SetFileAttributesFromAppW
     SetFileAttributesW
+    InternalSetFileAttributesW
     GetFileInformationByHandle
     GetFileInformationByHandleEx
     GetFileInformationByName
@@ -427,8 +428,9 @@ flowchart LR
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
     GetFileAttributesExFromAppW --> GetFileAttributesExW
-    SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesA --> SetFileAttributesW
+    SetFileAttributesFromAppW --> SetFileAttributesW
+    SetFileAttributesW --> InternalSetFileAttributesW
     GetFinalPathNameByHandleA --> GetFinalPathNameByHandleW
     end
 
@@ -444,7 +446,7 @@ flowchart LR
 
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
-    SetFileAttributesW --> NtOpenFile
+    InternalSetFileAttributesW --> NtOpenFile
     GetFileInformationByHandle --> NtQueryVolumeInformationFile
     GetFileInformationByHandle --> NtQueryInformationFile
     GetFileInformationByHandleEx --> NtQueryDirectoryFile
@@ -693,6 +695,18 @@ flowchart LR
     - ✅ `GetFileType`
     - ✅ `GetFinalPathNameByHandleA`
     - ✅ `GetFinalPathNameByHandleW`
+
+    KernelBase.dll (File Attributes):
+
+    - ✅ `GetFileAttributesA`
+    - ✅ `GetFileAttributesExA`
+    - ✅ `GetFileAttributesExFromAppW`
+    - ✅ `GetFileAttributesExW`
+    - ✅ `GetFileAttributesW`
+    - ✅ `SetFileAttributesA`
+    - ✅ `SetFileAttributesFromAppW`
+    - ✅ `SetFileAttributesW`
+    - ✅ `InternalSetFileAttributesW`
 
     KernelBase.dll (Read/Write Operations):
 
