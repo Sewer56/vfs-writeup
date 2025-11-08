@@ -447,6 +447,7 @@ flowchart LR
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     InternalSetFileAttributesW --> NtOpenFile
+    InternalSetFileAttributesW --> NtSetInformationFile
     GetFileInformationByHandle --> NtQueryVolumeInformationFile
     GetFileInformationByHandle --> NtQueryInformationFile
     GetFileInformationByHandleEx --> NtQueryDirectoryFile
