@@ -676,7 +676,7 @@ flowchart LR
     - ✅ `FindFirstFileTransactedW`
 
 
-!!! info "About WinRT/UWP 'Brokered' Functions (Windows 10 1803+)"
+!!! info "About WinRT/UWP Brokered 'FromApp' Functions (Windows 10 1803+)"
 
     Brokered calls are API calls that go through `RuntimeBroker.exe`, which acts as a security intermediary between UWP apps running in an AppContainer sandbox and system resources they need to access.
     
@@ -689,6 +689,18 @@ flowchart LR
         - This would require an extra hook on a separate process.
 
     I have not experimented, but based on code inspection, it'll redirect, then likely fail due to `ApplicationData.LocalFolder`/`Package.InstalledLocation` limitation, and then try routing through the broker (separate process).
+
+    !!! warning "This is inconsequential for most games."
+
+        ***This section concerns ONLY TRUE UWP APPS***
+
+        Most (pretty much all) games on the Xbox Store are Win32 titles which run using 'Desktop Bridge' a.k.a. 'Project Centennial'.
+
+        These Apps declare `<rescap:Capability Name="runFullTrust" />` in `AppXManifest.xml`, meaning they have full access to the filesystem like regular Win32 apps.
+
+        In those (basically all) cases, the VFS will run just fine, as it has been for a good handful of games with existing Reloaded-II mods.
+
+        It may be possible you can just add `runFullTrust` to any pure UWP app to have it work; that I'm not sure. Never ran into a real UWP game.
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
