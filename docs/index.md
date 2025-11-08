@@ -654,6 +654,7 @@ flowchart LR
     - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from NtCreateFile , so should still be redirected nonetheless.
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
     - `DecryptFileA` / `DecryptFileW` / `EncryptFileA` / `EncryptFileW` / `FileEncryptionStatusA` / `FileEncryptionStatusW` - Not supported with any game store, or even legacy games.
+    - `GetFileSecurityA` / `GetFileSecurityW` / `SetFileSecurityA` / `SetFileSecurityW` / `GetSecurityInfo` / `SetSecurityInfo` / `GetNamedSecurityInfoA` / `GetNamedSecurityInfoW` / `SetNamedSecurityInfoA` / `SetNamedSecurityInfoW` - Security descriptor and ACL management. Not supported with any game store, or even legacy games.
     - ✅ `FindFirstStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
     - ✅ `FindNextStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
     - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
