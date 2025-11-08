@@ -213,27 +213,54 @@ Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
 
     This graph focuses on the ***entry points*** into the VFS. Some redundant calls are considered. e.g. A function calling `NtClose` after calling `NtCreateFile` to clean up will point only to `NtCreateFile`. (We don't do anything in `NtClose`, other than update internal state.)
 
+!!! tip "Chart Organization"
+
+    The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points. The **[complete reference chart](#complete-api-flow-reference)** is available at the bottom.
+
+### Directory Enumeration
+
+All `FindFirst*` and `FindNext*` APIs converge through internal functions to `NtQueryDirectoryFileEx` for directory listing operations.
+
 ```mermaid
 flowchart LR
     subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
-
-    %% Definitions
     FindFirstFileA
     FindFirstFileExA
     FindFirstFileW
     FindFirstFileExW
     FindFirstFileExFromAppW
-    FindFirstFileNameW
     InternalFindFirstFileExW
     InternalFindFirstFileW
     FindNextFileA
     FindNextFileW
-    FindFirstStreamW
 
-    FindFirstChangeNotificationA
-    FindFirstChangeNotificationW
-    FindNextChangeNotification
+    FindFirstFileA --> InternalFindFirstFileExW
+    FindFirstFileExA --> InternalFindFirstFileW
+    FindFirstFileExFromAppW --> FindFirstFileExW
+    FindFirstFileExW --> InternalFindFirstFileExW
+    FindFirstFileW --> InternalFindFirstFileW
+    FindNextFileA --> FindNextFileW
+    end
 
+    subgraph NT["NT API (ntdll.dll)"]
+    NtOpenFile
+    NtQueryDirectoryFileEx
+
+    InternalFindFirstFileExW --> NtOpenFile
+    InternalFindFirstFileExW --> NtQueryDirectoryFileEx
+    InternalFindFirstFileW --> NtOpenFile
+    InternalFindFirstFileW --> NtQueryDirectoryFileEx
+    FindNextFileW --> NtQueryDirectoryFileEx
+    end
+```
+
+### File & Directory Creation
+
+All `CreateFile*` and `CreateDirectory*` APIs funnel through internal functions to `NtCreateFile`, along with optional metadata operations.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
     CreateDirectory2A
     CreateDirectory2W
     CreateDirectoryA
@@ -253,61 +280,7 @@ flowchart LR
     CreateDirectoryFromAppW
     CreateDirectoryTransactedA
     CreateDirectoryTransactedW
-    DeleteFile2A
-    DeleteFile2W
-    DeleteFileA
-    DeleteFileW
-    DeleteFileFromAppW
-    InternalDeleteFileW
-    GetCompressedFileSizeA
-    GetCompressedFileSizeW
-    CloseHandle
 
-    CreateFileMapping2
-    CreateFileMappingFromApp
-    CreateFileMappingNumaA
-    CreateFileMappingNumaW
-    CreateFileMappingW
-
-    CreateHardLinkA
-    CreateHardLinkW
-
-    CreateSymbolicLinkA
-    CreateSymbolicLinkW
-    CreateSymbolicLinkTransactedA
-    CreateSymbolicLinkTransactedW
-
-    CopyFileA
-    CopyFileW
-    CopyFile2
-    CopyFileExA
-    CopyFileExW
-    CopyFileFromAppW
-    CopyFileTransactedA
-    CopyFileTransactedW
-    BasepCopyFileExW
-
-    GetFileAttributesA
-    GetFileAttributesExA
-    GetFileAttributesExFromAppW
-    GetFileAttributesExW
-    GetFileAttributesW
-    SetFileAttributesA
-    SetFileAttributesFromAppW
-    SetFileAttributesW
-
-    RemoveDirectoryA
-    RemoveDirectoryFromAppW
-    RemoveDirectoryW
-
-    %%% Win32 Internal Redirects
-    FindFirstFileA --> InternalFindFirstFileExW
-    FindFirstFileExA --> InternalFindFirstFileW
-    FindFirstFileExFromAppW --> FindFirstFileExW
-    FindFirstFileExW --> InternalFindFirstFileExW
-    FindFirstFileW --> InternalFindFirstFileW
-    FindNextFileA --> FindNextFileW
-    FindFirstChangeNotificationA --> FindFirstChangeNotificationW
     CreateDirectory2A --> InternalCreateDirectoryW
     CreateDirectory2W --> InternalCreateDirectoryW
     CreateDirectoryA --> CreateDirectoryW
@@ -325,66 +298,14 @@ flowchart LR
     CreateFileTransactedW --> CreateFileW
     CreateDirectoryFromAppW --> CreateDirectoryW
     CreateFileFromAppW --> CreateFile2FromAppW
-    DeleteFile2A --> InternalDeleteFileW
-    DeleteFile2W --> InternalDeleteFileW
-    DeleteFileFromAppW --> DeleteFileW
-    DeleteFileA --> DeleteFileW
-    DeleteFileW --> InternalDeleteFileW
-    GetCompressedFileSizeA --> GetCompressedFileSizeW
-    GetFileAttributesA --> GetFileAttributesW
-    GetFileAttributesExA --> GetFileAttributesExW
-    GetFileAttributesExFromAppW --> GetFileAttributesExW
-    RemoveDirectoryA --> RemoveDirectoryW
-    RemoveDirectoryFromAppW --> RemoveDirectoryW
-    SetFileAttributesFromAppW --> SetFileAttributesW
-    SetFileAttributesA --> SetFileAttributesW
-    CreateFileMappingNumaA --> CreateFileMappingNumaW
-    CreateFileMappingFromApp --> CreateFileMappingNumaW
-    CreateHardLinkA --> CreateHardLinkW
-    CreateSymbolicLinkA --> CreateSymbolicLinkW
-    CreateSymbolicLinkTransactedA --> CreateSymbolicLinkTransactedW
-    CreateSymbolicLinkTransactedW --> CreateSymbolicLinkW
-    CopyFileA --> CopyFileW
-    CopyFileW --> CopyFileExW
-    CopyFileExA --> CopyFileExW
-    CopyFileExW --> BasepCopyFileExW
-    CopyFile2 --> BasepCopyFileExW
-    CopyFileFromAppW --> CopyFileW
-    CopyFileTransactedA --> CopyFileExA
-    CopyFileTransactedW --> CopyFileExW
     end
 
-    subgraph NT API["NT API (ntdll.dll/ntoskrnl.exe)"]
-    %% Definitions
+    subgraph NT["NT API (ntdll.dll)"]
     NtCreateFile
-    NtOpenFile
-    NtQueryDirectoryFile
-    NtQueryDirectoryFileEx
-    NtDeleteFile
-    NtQueryAttributesFile
-    NtQueryFullAttributesFile
-    NtQueryInformationFile
     NtSetInformationFile
-    NtNotifyChangeDirectoryFile
-    NtNotifyChangeDirectoryFileEx
-    NtCreateSection
-    NtCreateSectionEx
-    NtClose
+    NtQueryInformationFile
+    NtOpenFile
 
-    %%% Win32 -> NT API
-    InternalFindFirstFileExW --> NtOpenFile
-    InternalFindFirstFileExW --> NtQueryDirectoryFileEx
-    InternalFindFirstFileW --> NtOpenFile
-    InternalFindFirstFileW --> NtQueryDirectoryFileEx
-    FindNextFileW --> NtQueryDirectoryFileEx
-    FindFirstFileNameW --> NtCreateFile
-    FindFirstFileNameW --> NtQueryInformationFile
-    FindFirstStreamW --> NtCreateFile
-    FindFirstStreamW --> NtQueryInformationFile
-    FindFirstChangeNotificationW --> NtOpenFile
-    FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
-    FindNextChangeNotification --> NtNotifyChangeDirectoryFile
-    NtNotifyChangeDirectoryFile --> NtNotifyChangeDirectoryFileEx
     CreateFileInternal --> NtCreateFile
     CreateFileInternal --> NtSetInformationFile
     CreateFileInternal --> NtQueryInformationFile
@@ -395,27 +316,446 @@ flowchart LR
     CreateDirectoryExW --> NtQueryInformationFile
     CreateDirectoryExW --> NtCreateFile
     CreateDirectoryExW --> NtSetInformationFile
+    end
+```
+
+### File & Directory Deletion
+
+All deletion APIs (`DeleteFile*` and `RemoveDirectory*`) converge through `InternalDeleteFileW` to NT-level operations.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    DeleteFile2A
+    DeleteFile2W
+    DeleteFileA
+    DeleteFileW
+    DeleteFileFromAppW
+    InternalDeleteFileW
+    RemoveDirectoryA
+    RemoveDirectoryFromAppW
+    RemoveDirectoryW
+
+    DeleteFile2A --> InternalDeleteFileW
+    DeleteFile2W --> InternalDeleteFileW
+    DeleteFileFromAppW --> DeleteFileW
+    DeleteFileA --> DeleteFileW
+    DeleteFileW --> InternalDeleteFileW
+    RemoveDirectoryA --> RemoveDirectoryW
+    RemoveDirectoryFromAppW --> RemoveDirectoryW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtOpenFile
+    NtQueryInformationFile
+    NtSetInformationFile
+
     InternalDeleteFileW --> NtOpenFile
     InternalDeleteFileW --> NtQueryInformationFile
     InternalDeleteFileW --> NtSetInformationFile
     RemoveDirectoryW --> NtOpenFile
-    GetCompressedFileSizeW --> NtOpenFile
-    CloseHandle --> NtClose
-    CreateFileMapping2 --> NtCreateSectionEx
-    CreateFileMappingNumaW --> NtCreateSection
-    CreateFileMappingW --> NtCreateSection
-    CreateHardLinkW --> NtOpenFile
-    CreateHardLinkW --> NtSetInformationFile
-    CreateSymbolicLinkW --> NtCreateFile
-    CreateSymbolicLinkW --> NtSetInformationFile
-    BasepCopyFileExW --> NtCreateFile
-    BasepCopyFileExW --> NtQueryInformationFile
-    BasepCopyFileExW --> NtSetInformationFile
+    end
+```
+
+### File Attributes
+
+Query and modification of file attributes through `GetFileAttributes*` and `SetFileAttributes*` APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    GetFileAttributesA
+    GetFileAttributesExA
+    GetFileAttributesExFromAppW
+    GetFileAttributesExW
+    GetFileAttributesW
+    SetFileAttributesA
+    SetFileAttributesFromAppW
+    SetFileAttributesW
+
+    GetFileAttributesA --> GetFileAttributesW
+    GetFileAttributesExA --> GetFileAttributesExW
+    GetFileAttributesExFromAppW --> GetFileAttributesExW
+    RemoveDirectoryA --> RemoveDirectoryW
+    RemoveDirectoryFromAppW --> RemoveDirectoryW
+    SetFileAttributesFromAppW --> SetFileAttributesW
+    SetFileAttributesA --> SetFileAttributesW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtQueryAttributesFile
+    NtQueryFullAttributesFile
+    NtOpenFile
+
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     SetFileAttributesW --> NtOpenFile
     end
 ```
+
+### File Copy Operations
+
+All `CopyFile*` variants converge through `BasepCopyFileExW` for the actual copy implementation.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CopyFileA
+    CopyFileW
+    CopyFile2
+    CopyFileExA
+    CopyFileExW
+    CopyFileFromAppW
+    CopyFileTransactedA
+    CopyFileTransactedW
+    BasepCopyFileExW
+
+    CopyFileA --> CopyFileW
+    CopyFileW --> CopyFileExW
+    CopyFileExA --> CopyFileExW
+    CopyFileExW --> BasepCopyFileExW
+    CopyFile2 --> BasepCopyFileExW
+    CopyFileFromAppW --> CopyFileW
+    CopyFileTransactedA --> CopyFileExA
+    CopyFileTransactedW --> CopyFileExW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtCreateFile
+    NtQueryInformationFile
+    NtSetInformationFile
+
+    BasepCopyFileExW --> NtCreateFile
+    BasepCopyFileExW --> NtQueryInformationFile
+    BasepCopyFileExW --> NtSetInformationFile
+    end
+```
+
+### Links & Symbolic Links
+
+Creation of hard links and symbolic links through dedicated APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CreateHardLinkA
+    CreateHardLinkW
+    CreateSymbolicLinkA
+    CreateSymbolicLinkW
+    CreateSymbolicLinkTransactedA
+    CreateSymbolicLinkTransactedW
+
+    CreateHardLinkA --> CreateHardLinkW
+    CreateSymbolicLinkA --> CreateSymbolicLinkW
+    CreateSymbolicLinkTransactedA --> CreateSymbolicLinkTransactedW
+    CreateSymbolicLinkTransactedW --> CreateSymbolicLinkW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtOpenFile
+    NtCreateFile
+    NtSetInformationFile
+
+    CreateHardLinkW --> NtOpenFile
+    CreateHardLinkW --> NtSetInformationFile
+    CreateSymbolicLinkW --> NtCreateFile
+    CreateSymbolicLinkW --> NtSetInformationFile
+    end
+```
+
+### Memory Mapped Files
+
+All `CreateFileMapping*` APIs for memory-mapped file creation converge to NT section APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CreateFileMapping2
+    CreateFileMappingFromApp
+    CreateFileMappingNumaA
+    CreateFileMappingNumaW
+    CreateFileMappingW
+
+    CreateFileMappingNumaA --> CreateFileMappingNumaW
+    CreateFileMappingFromApp --> CreateFileMappingNumaW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtCreateSection
+    NtCreateSectionEx
+
+    CreateFileMapping2 --> NtCreateSectionEx
+    CreateFileMappingNumaW --> NtCreateSection
+    CreateFileMappingW --> NtCreateSection
+    end
+```
+
+### Change Notifications
+
+Directory change monitoring APIs for tracking file system modifications.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    FindFirstChangeNotificationA
+    FindFirstChangeNotificationW
+    FindNextChangeNotification
+
+    FindFirstChangeNotificationA --> FindFirstChangeNotificationW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtOpenFile
+    NtNotifyChangeDirectoryFile
+    NtNotifyChangeDirectoryFileEx
+
+    FindFirstChangeNotificationW --> NtOpenFile
+    FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
+    FindNextChangeNotification --> NtNotifyChangeDirectoryFile
+    NtNotifyChangeDirectoryFile --> NtNotifyChangeDirectoryFileEx
+    end
+```
+
+### Miscellaneous APIs
+
+Additional file operations including stream enumeration, file name enumeration, compression info, and handle cleanup.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    FindFirstFileNameW
+    FindFirstStreamW
+    GetCompressedFileSizeA
+    GetCompressedFileSizeW
+    CloseHandle
+
+    GetCompressedFileSizeA --> GetCompressedFileSizeW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtCreateFile
+    NtQueryInformationFile
+    NtOpenFile
+    NtClose
+
+    FindFirstFileNameW --> NtCreateFile
+    FindFirstFileNameW --> NtQueryInformationFile
+    FindFirstStreamW --> NtCreateFile
+    FindFirstStreamW --> NtQueryInformationFile
+    GetCompressedFileSizeW --> NtOpenFile
+    CloseHandle --> NtClose
+    end
+```
+
+### Complete API Flow Reference
+
+??? note "Complete API flow chart showing all Win32 to NT API relationships"
+
+    This comprehensive chart shows every tracked API and their relationships. Use the focused charts above for specific operations.
+
+    ```mermaid
+    flowchart LR
+        subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+
+        %% Definitions
+        FindFirstFileA
+        FindFirstFileExA
+        FindFirstFileW
+        FindFirstFileExW
+        FindFirstFileExFromAppW
+        FindFirstFileNameW
+        InternalFindFirstFileExW
+        InternalFindFirstFileW
+        FindNextFileA
+        FindNextFileW
+        FindFirstStreamW
+
+        FindFirstChangeNotificationA
+        FindFirstChangeNotificationW
+        FindNextChangeNotification
+
+        CreateDirectory2A
+        CreateDirectory2W
+        CreateDirectoryA
+        CreateDirectoryW
+        InternalCreateDirectoryW
+        InternalCreateDirectoryW_Old
+        CreateFileA
+        CreateFileW
+        CreateFile2
+        CreateFile3
+        CreateFileInternal
+        CreateFile2FromAppW
+        CreateFileFromAppW
+        CreateFileTransactedA
+        CreateFileTransactedW
+        CreateDirectoryExW
+        CreateDirectoryFromAppW
+        CreateDirectoryTransactedA
+        CreateDirectoryTransactedW
+        DeleteFile2A
+        DeleteFile2W
+        DeleteFileA
+        DeleteFileW
+        DeleteFileFromAppW
+        InternalDeleteFileW
+        GetCompressedFileSizeA
+        GetCompressedFileSizeW
+        CloseHandle
+
+        CreateFileMapping2
+        CreateFileMappingFromApp
+        CreateFileMappingNumaA
+        CreateFileMappingNumaW
+        CreateFileMappingW
+
+        CreateHardLinkA
+        CreateHardLinkW
+
+        CreateSymbolicLinkA
+        CreateSymbolicLinkW
+        CreateSymbolicLinkTransactedA
+        CreateSymbolicLinkTransactedW
+
+        CopyFileA
+        CopyFileW
+        CopyFile2
+        CopyFileExA
+        CopyFileExW
+        CopyFileFromAppW
+        CopyFileTransactedA
+        CopyFileTransactedW
+        BasepCopyFileExW
+
+        GetFileAttributesA
+        GetFileAttributesExA
+        GetFileAttributesExFromAppW
+        GetFileAttributesExW
+        GetFileAttributesW
+        SetFileAttributesA
+        SetFileAttributesFromAppW
+        SetFileAttributesW
+
+        RemoveDirectoryA
+        RemoveDirectoryFromAppW
+        RemoveDirectoryW
+
+        %%% Win32 Internal Redirects
+        FindFirstFileA --> InternalFindFirstFileExW
+        FindFirstFileExA --> InternalFindFirstFileW
+        FindFirstFileExFromAppW --> FindFirstFileExW
+        FindFirstFileExW --> InternalFindFirstFileExW
+        FindFirstFileW --> InternalFindFirstFileW
+        FindNextFileA --> FindNextFileW
+        FindFirstChangeNotificationA --> FindFirstChangeNotificationW
+        CreateDirectory2A --> InternalCreateDirectoryW
+        CreateDirectory2W --> InternalCreateDirectoryW
+        CreateDirectoryA --> CreateDirectoryW
+        CreateDirectoryW --> InternalCreateDirectoryW
+        CreateDirectoryW --> InternalCreateDirectoryW_Old
+        CreateDirectoryTransactedA --> CreateDirectoryTransactedW
+        CreateDirectoryTransactedW --> CreateDirectoryW
+        CreateDirectoryTransactedW --> CreateDirectoryExW
+        CreateFileA --> CreateFileInternal
+        CreateFileW --> CreateFileInternal
+        CreateFile2 --> CreateFileInternal
+        CreateFile3 --> CreateFileInternal
+        CreateFile2FromAppW --> CreateFile2
+        CreateFileTransactedA --> CreateFileTransactedW
+        CreateFileTransactedW --> CreateFileW
+        CreateDirectoryFromAppW --> CreateDirectoryW
+        CreateFileFromAppW --> CreateFile2FromAppW
+        DeleteFile2A --> InternalDeleteFileW
+        DeleteFile2W --> InternalDeleteFileW
+        DeleteFileFromAppW --> DeleteFileW
+        DeleteFileA --> DeleteFileW
+        DeleteFileW --> InternalDeleteFileW
+        GetCompressedFileSizeA --> GetCompressedFileSizeW
+        GetFileAttributesA --> GetFileAttributesW
+        GetFileAttributesExA --> GetFileAttributesExW
+        GetFileAttributesExFromAppW --> GetFileAttributesExW
+        RemoveDirectoryA --> RemoveDirectoryW
+        RemoveDirectoryFromAppW --> RemoveDirectoryW
+        SetFileAttributesFromAppW --> SetFileAttributesW
+        SetFileAttributesA --> SetFileAttributesW
+        CreateFileMappingNumaA --> CreateFileMappingNumaW
+        CreateFileMappingFromApp --> CreateFileMappingNumaW
+        CreateHardLinkA --> CreateHardLinkW
+        CreateSymbolicLinkA --> CreateSymbolicLinkW
+        CreateSymbolicLinkTransactedA --> CreateSymbolicLinkTransactedW
+        CreateSymbolicLinkTransactedW --> CreateSymbolicLinkW
+        CopyFileA --> CopyFileW
+        CopyFileW --> CopyFileExW
+        CopyFileExA --> CopyFileExW
+        CopyFileExW --> BasepCopyFileExW
+        CopyFile2 --> BasepCopyFileExW
+        CopyFileFromAppW --> CopyFileW
+        CopyFileTransactedA --> CopyFileExA
+        CopyFileTransactedW --> CopyFileExW
+        end
+
+        subgraph NT API["NT API (ntdll.dll/ntoskrnl.exe)"]
+        %% Definitions
+        NtCreateFile
+        NtOpenFile
+        NtQueryDirectoryFile
+        NtQueryDirectoryFileEx
+        NtDeleteFile
+        NtQueryAttributesFile
+        NtQueryFullAttributesFile
+        NtQueryInformationFile
+        NtSetInformationFile
+        NtNotifyChangeDirectoryFile
+        NtNotifyChangeDirectoryFileEx
+        NtCreateSection
+        NtCreateSectionEx
+        NtClose
+
+        %%% Win32 -> NT API
+        InternalFindFirstFileExW --> NtOpenFile
+        InternalFindFirstFileExW --> NtQueryDirectoryFileEx
+        InternalFindFirstFileW --> NtOpenFile
+        InternalFindFirstFileW --> NtQueryDirectoryFileEx
+        FindNextFileW --> NtQueryDirectoryFileEx
+        FindFirstFileNameW --> NtCreateFile
+        FindFirstFileNameW --> NtQueryInformationFile
+        FindFirstStreamW --> NtCreateFile
+        FindFirstStreamW --> NtQueryInformationFile
+        FindFirstChangeNotificationW --> NtOpenFile
+        FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
+        FindNextChangeNotification --> NtNotifyChangeDirectoryFile
+        NtNotifyChangeDirectoryFile --> NtNotifyChangeDirectoryFileEx
+        CreateFileInternal --> NtCreateFile
+        CreateFileInternal --> NtSetInformationFile
+        CreateFileInternal --> NtQueryInformationFile
+        CreateDirectoryW --> NtCreateFile
+        InternalCreateDirectoryW --> NtCreateFile
+        InternalCreateDirectoryW_Old --> NtCreateFile
+        CreateDirectoryExW --> NtOpenFile
+        CreateDirectoryExW --> NtQueryInformationFile
+        CreateDirectoryExW --> NtCreateFile
+        CreateDirectoryExW --> NtSetInformationFile
+        InternalDeleteFileW --> NtOpenFile
+        InternalDeleteFileW --> NtQueryInformationFile
+        InternalDeleteFileW --> NtSetInformationFile
+        RemoveDirectoryW --> NtOpenFile
+        GetCompressedFileSizeW --> NtOpenFile
+        CloseHandle --> NtClose
+        CreateFileMapping2 --> NtCreateSectionEx
+        CreateFileMappingNumaW --> NtCreateSection
+        CreateFileMappingW --> NtCreateSection
+        CreateHardLinkW --> NtOpenFile
+        CreateHardLinkW --> NtSetInformationFile
+        CreateSymbolicLinkW --> NtCreateFile
+        CreateSymbolicLinkW --> NtSetInformationFile
+        BasepCopyFileExW --> NtCreateFile
+        BasepCopyFileExW --> NtQueryInformationFile
+        BasepCopyFileExW --> NtSetInformationFile
+        GetFileAttributesExW --> NtQueryFullAttributesFile
+        GetFileAttributesW --> NtQueryAttributesFile
+        SetFileAttributesW --> NtOpenFile
+        end
+    ```
 
 ??? note "Notable Functions we probably won't ever need but FYI"
 
