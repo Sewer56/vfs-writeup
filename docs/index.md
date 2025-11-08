@@ -189,7 +189,7 @@ When game opens 'game/player.model':
   5. Layer 2 passes data back to game
 ```
 
-## Hook Endpoints
+## Hook Endpoints (Windows)
 
 Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
 
@@ -636,7 +636,7 @@ flowchart LR
     end
 ```
 
-??? note "Notable Functions we probably won't ever need but FYI"
+??? info "Notable Functions we probably won't ever need but FYI"
 
     - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from NtCreateFile , so should still be redirected nonetheless.
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
@@ -645,126 +645,24 @@ flowchart LR
     - ✅ `FindNextStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
     - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
 
-??? note "Roots (as of Windows 11 25H2)"
+    KernelBase.dll (WTF?):
 
-    [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) and [Winbase.h](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createdirectorytransacteda) is also a good resource.
+    - `CreateFileDowngrade_Win7` - 1 liner that adds a flag to a pointer passed in.
 
-    KernelBase.dll (Files):
+!!! note "Roots (as of Windows 11 25H2)"
 
-    - ✅ `CreateDirectory2A`
-    - ✅ `CreateDirectory2W`
-    - ✅ `InternalCreateDirectoryW`
-    - ✅ `CreateDirectoryA`
-    - ✅ `CreateDirectoryExW`
-    - ✅ `CreateDirectoryFromAppW`
-    - ✅ `CreateFile2`
-    - ✅ `CreateFile2FromAppW`
-    - ✅ `CreateFile3`
-    - ✅ `CreateFileA`
-    - ✅ `CreateFileFromAppW`
-    - ✅ `CreateFileW`
+    Look at [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) and [Winbase.h](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createdirectorytransacteda). These are good resources that are fairly up to date for Win32.
 
-    KernelBase.dll (File Enumeration):
+    The above graphs were made using those as the starting point; combines with own searching through exports.
 
-    - ✅ `FindFirstFileA`
-    - ✅ `FindFirstFileW`
-    - ✅ `FindFirstFileExA`
-    - ✅ `FindFirstFileExW`
-    - ✅ `FindFirstFileExFromAppW`
-    - ✅ `InternalFindFirstFileExW`
-    - ✅ `InternalFindFirstFileW`
+!!! info "About Transactional NTFS (Deprecated)"
 
-    KernelBase.dll (No-op):
+    This is a feature introduced in Windows Vista (2007), and deprecated in Windows 8 in 2012. It was deprecated due to lack of adoption and complexity. Documentation heavily discourages its use and notes it as 'slated for removal'.
 
-    - `FindClose` -> `NtClose`
+    The code for this function wasn't even moved from `kernel32.dll` to `kernelbase.dll`. Likewise, I've never to date seen a program that uses this feature.
 
-    KernelBase.dll (Change Notification):
+    Behind the scenes this uses the regular APIs, but wrapped around `RtlGetCurrentTransaction` and `RtlSetCurrentTransaction` calls. So whatever we write will nonetheless work out the box. Included in the graphs for completeness.
 
-    - ✅ `FindFirstChangeNotificationA`
-    - ✅ `FindFirstChangeNotificationW`
-    - ✅ `FindNextChangeNotification`
-
-    KernelBase.dll (File Information Queries):
-
-    - ✅ `GetFileInformationByHandle`
-    - ✅ `GetFileInformationByHandleEx`
-    - ✅ `GetFileInformationByName`
-    - ✅ `GetFileSize`
-    - ✅ `GetFileSizeEx`
-    - ✅ `GetFileTime`
-    - ✅ `GetFileType`
-    - ✅ `GetFinalPathNameByHandleA`
-    - ✅ `GetFinalPathNameByHandleW`
-
-    KernelBase.dll (File Attributes):
-
-    - ✅ `GetFileAttributesA`
-    - ✅ `GetFileAttributesExA`
-    - ✅ `GetFileAttributesExFromAppW`
-    - ✅ `GetFileAttributesExW`
-    - ✅ `GetFileAttributesW`
-    - ✅ `SetFileAttributesA`
-    - ✅ `SetFileAttributesFromAppW`
-    - ✅ `SetFileAttributesW`
-    - ✅ `InternalSetFileAttributesW`
-
-    KernelBase.dll (Read/Write Operations):
-
-    - ✅ `ReadFile`
-    - ✅ `ReadFileEx`
-    - ✅ `ReadFileScatter`
-    - ✅ `SetEndOfFile`
-
-    KernelBase.dll (Memory Mapping):
-
-    - ✅ `CreateFileMapping2`
-    - ✅ `CreateFileMappingFromApp`
-    - ✅ `CreateFileMappingNumaA`
-    - ✅ `CreateFileMappingNumaW`
-    - ✅ `CreateFileMappingW`
-  
-    KernelBase.dll (File Locking):
-
-    - ✅ `LockFile`
-    - ✅ `LockFileEx`
-
-    KernelBase.dll (Copy):
-
-    - ✅ `CopyFileA`
-    - ✅ `CopyFileW`
-    - ✅ `CopyFile2`
-    - ✅ `CopyFileExA`
-    - ✅ `CopyFileExW`
-    - ✅ `CopyFileFromAppW`
-
-    KernelBase.dll (Links / Write):
-
-    - ✅ `CreateHardLinkA`
-    - ✅ `CreateHardLinkW`
-    - ✅ `CreateSymbolicLinkA`
-    - ✅ `CreateSymbolicLinkW`
-    - ✅ `FindFirstFileNameW`
-    - ✅ `FindNextFileNameW`
-    - ✅ `DeleteFile2A`
-    - ✅ `DeleteFile2W`
-    - ✅ `DeleteFileA`
-    - ✅ `DeleteFileW`
-    - ✅ `DeleteFileFromAppW`
-    - ✅ `InternalDeleteFileW`
-    - ✅ `RemoveDirectory2A`
-    - ✅ `RemoveDirectory2W`
-    - ✅ `RemoveDirectoryA`
-    - ✅ `RemoveDirectoryW`
-    - ✅ `RemoveDirectoryFromAppW`
-    - ✅ `InternalRemoveDirectoryW`
-  
-    Transactional NTFS (Deprecated):
-
-    - This is a feature introduced in Windows Vista (2007), and deprecated in Windows 8 in 2012. It was deprecated due to lack of adoption and complexity.
-    - Documentation heavily discourages its use and notes it as 'slated for removal'.
-    - It in fact wasn't even moved from `kernel32.dll` to `kernelbase.dll`.
-    - I've never to date seen a program that uses this feature.
-    - Behind the scenes this uses the regular APIs, but wrapped around `RtlGetCurrentTransaction` and `RtlSetCurrentTransaction` calls. 
     - ✅ `CopyFileTransactedA`
     - ✅ `CopyFileTransactedW`
     - ✅ `CreateDirectoryTransactedA`
@@ -776,13 +674,18 @@ flowchart LR
     - ✅ `FindFirstFileTransactedA`
     - ✅ `FindFirstFileTransactedW`
 
-    KernelBase.dll (UWP - uses another process - not investigated):
 
-    - BrokeredCreateDirectoryW
+!!! info "About WinRT/UWP 'Brokered' Functions"
 
-    KernelBase.dll (WTF?):
+    Brokered calls are API calls that go through `RuntimeBroker.exe`, which acts as a security intermediary between UWP apps running in an AppContainer sandbox and system resources they need to access.
+    
+    The broker enforces capability-based security and permission checks.
 
-    - `CreateFileDowngrade_Win7` - 1 liner that adds a flag to a pointer passed in.
+    APIs such as CreateFile2 support this out of the box, however, it is heavily restricted. You can only open files or directories inside `ApplicationData.LocalFolder` or `Package.InstalledLocation` directories.
+
+    I have not investigated how this works, but it appears this is enforced in kernel, behind the `ntdll.dll` functions we're hooking, so we're okay.
+    
+    But chances are if we use VFS from UWP, it'll just error since it's not allowed to access the new file.
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 
@@ -791,10 +694,6 @@ flowchart LR
     **`NtNotifyChangeDirectoryFileEx`:** Conversely, `NtNotifyChangeDirectoryFile` wraps `NtNotifyChangeDirectoryFileEx` on modern Windows versions. I have not verified which version made this change.
     
     **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behavior.
-
-!!! info "This currently only contains information for Windows."
-
-    Native support for other OSes will be added in the future.
 
 ### Layer 1: Virtual FileSystem
 
