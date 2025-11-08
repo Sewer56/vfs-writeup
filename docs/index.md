@@ -369,7 +369,7 @@ flowchart LR
 
 ### File Attributes
 
-Query and modification of file attributes through `GetFileAttributes*` and `SetFileAttributes*` APIs.
+Query and modification of file attributes. Path-based queries use `GetFileAttributes*` and `SetFileAttributes*` APIs, handle-based queries use `GetFileInformationByHandle*` APIs, and name-based queries use `GetFileInformationByName`.
 
 ```mermaid
 flowchart LR
@@ -382,6 +382,9 @@ flowchart LR
     SetFileAttributesA
     SetFileAttributesFromAppW
     SetFileAttributesW
+    GetFileInformationByHandle
+    GetFileInformationByHandleEx
+    GetFileInformationByName
 
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
@@ -393,13 +396,27 @@ flowchart LR
     subgraph NT["NT API (ntdll.dll)"]
     NtQueryAttributesFile
     NtQueryFullAttributesFile
+    NtQueryInformationFile
+    NtQueryInformationByName
+    NtQueryVolumeInformationFile
+    NtQueryDirectoryFile
     NtOpenFile
 
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     SetFileAttributesW --> NtOpenFile
+    GetFileInformationByHandle --> NtQueryVolumeInformationFile
+    GetFileInformationByHandle --> NtQueryInformationFile
+    GetFileInformationByHandleEx --> NtQueryDirectoryFile
+    GetFileInformationByHandleEx --> NtQueryInformationFile
+    GetFileInformationByHandleEx --> NtQueryVolumeInformationFile
+    GetFileInformationByName --> NtQueryInformationByName
     end
 ```
+
+!!! info "NtQueryVolumeInformationFile does not need emulation"
+
+    `NtQueryVolumeInformationFile` queries volume-level information (filesystem type, serial number, etc.) rather than individual file metadata. Since we're not virtualizing entire volumes, this API can pass through without interception.
 
 ### File Copy Operations
 
@@ -610,6 +627,12 @@ flowchart LR
     - ✅ `FindFirstChangeNotificationA`
     - ✅ `FindFirstChangeNotificationW`
     - ✅ `FindNextChangeNotification`
+
+    KernelBase.dll (File Information Queries):
+
+    - ✅ `GetFileInformationByHandle`
+    - ✅ `GetFileInformationByHandleEx`
+    - ✅ `GetFileInformationByName`
 
     KernelBase.dll (Memory Mapping):
 
