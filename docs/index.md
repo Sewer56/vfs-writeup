@@ -239,8 +239,12 @@ flowchart LR
     CreateFileInternal
     CreateFile2FromAppW
     CreateFileFromAppW
+    CreateFileTransactedA
+    CreateFileTransactedW
     CreateDirectoryExW
     CreateDirectoryFromAppW
+    CreateDirectoryTransactedA
+    CreateDirectoryTransactedW
     DeleteFile2A
     DeleteFile2W
     DeleteFileA
@@ -253,11 +257,22 @@ flowchart LR
 
     CreateFileMapping2
     CreateFileMappingFromApp
+    CreateFileMappingNumaA
     CreateFileMappingNumaW
     CreateFileMappingW
 
     CreateHardLinkA
     CreateHardLinkW
+
+    CopyFileA
+    CopyFileW
+    CopyFile2
+    CopyFileExA
+    CopyFileExW
+    CopyFileFromAppW
+    CopyFileTransactedA
+    CopyFileTransactedW
+    BasepCopyFileExW
 
     GetFileAttributesA
     GetFileAttributesExA
@@ -282,11 +297,16 @@ flowchart LR
     CreateDirectoryA --> CreateDirectoryW
     CreateDirectoryW --> InternalCreateDirectoryW
     CreateDirectoryW --> InternalCreateDirectoryW_Old
+    CreateDirectoryTransactedA --> CreateDirectoryTransactedW
+    CreateDirectoryTransactedW --> CreateDirectoryW
+    CreateDirectoryTransactedW --> CreateDirectoryExW
     CreateFileA --> CreateFileInternal
     CreateFileW --> CreateFileInternal
     CreateFile2 --> CreateFileInternal
     CreateFile3 --> CreateFileInternal
     CreateFile2FromAppW --> CreateFile2
+    CreateFileTransactedA --> CreateFileTransactedW
+    CreateFileTransactedW --> CreateFileW
     CreateDirectoryFromAppW --> CreateDirectoryW
     CreateFileFromAppW --> CreateFile2FromAppW
     DeleteFile2A --> InternalDeleteFileW
@@ -302,8 +322,17 @@ flowchart LR
     RemoveDirectoryFromAppW --> RemoveDirectoryW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesA --> SetFileAttributesW
+    CreateFileMappingNumaA --> CreateFileMappingNumaW
     CreateFileMappingFromApp --> CreateFileMappingNumaW
     CreateHardLinkA --> CreateHardLinkW
+    CopyFileA --> CopyFileW
+    CopyFileW --> CopyFileExW
+    CopyFileExA --> CopyFileExW
+    CopyFileExW --> BasepCopyFileExW
+    CopyFile2 --> BasepCopyFileExW
+    CopyFileFromAppW --> CopyFileW
+    CopyFileTransactedA --> CopyFileExA
+    CopyFileTransactedW --> CopyFileExW
     end
 
     subgraph NT API
@@ -348,6 +377,9 @@ flowchart LR
     CreateFileMappingW --> NtCreateSection
     CreateHardLinkW --> NtOpenFile
     CreateHardLinkW --> NtSetInformationFile
+    BasepCopyFileExW --> NtCreateFile
+    BasepCopyFileExW --> NtQueryInformationFile
+    BasepCopyFileExW --> NtSetInformationFile
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
     SetFileAttributesW --> NtOpenFile
@@ -380,12 +412,14 @@ flowchart LR
 
     - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions.
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
+    - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
 
 ??? note "Roots (as of Windows 11 25H2)"
 
     [Fileapi.h](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createdirectory2a) and [Winbase.h](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createdirectorytransacteda) is also a good resource.
 
     KernelBase.dll (Files):
+
     - ✅ `CreateDirectory2A`
     - ✅ `CreateDirectory2W`
     - ✅ `InternalCreateDirectoryW`
@@ -400,15 +434,28 @@ flowchart LR
     - ✅ `CreateFileW`
 
     KernelBase.dll (No-op):
+
     - `FindClose` -> `NtClose`
 
     KernelBase.dll (Memory Mapping):
+
     - ✅ `CreateFileMapping2`
     - ✅ `CreateFileMappingFromApp`
+    - ✅ `CreateFileMappingNumaA`
     - ✅ `CreateFileMappingNumaW`
     - ✅ `CreateFileMappingW`
   
+    KernelBase.dll (Copy):
+
+    - ✅ `CopyFileA`
+    - ✅ `CopyFileW`
+    - ✅ `CopyFile2`
+    - ✅ `CopyFileExA`
+    - ✅ `CopyFileExW`
+    - ✅ `CopyFileFromAppW`
+
     KernelBase.dll (Links / Write):
+
     - ✅ `CreateHardLinkA`
     - ✅ `CreateHardLinkW`
     - ✅ `DeleteFile2A`
@@ -419,12 +466,25 @@ flowchart LR
     - ✅ `InternalDeleteFileW`
   
     Transactional NTFS (Deprecated):
-    - ✅ CreateDirectoryTransactedA
+
+    - This is a feature introduced in Windows Vista (2007), and deprecated in Windows 8 in 2012. It was deprecated due to lack of adoption and complexity.
+    - Documentation heavily discourages its use and notes it as 'slated for removal'.
+    - It in fact wasn't even moved from `kernel32.dll` to `kernelbase.dll`.
+    - I've never to date seen a program that uses this feature.
+    - Behind the scenes this uses the regular APIs, but wrapped around `RtlGetCurrentTransaction` and `RtlSetCurrentTransaction` calls. 
+    - ✅ `CopyFileTransactedA`
+    - ✅ `CopyFileTransactedW`
+    - ✅ `CreateDirectoryTransactedA`
+    - ✅ `CreateDirectoryTransactedW`
+    - ✅ `CreateFileTransactedA`
+    - ✅ `CreateFileTransactedW`
 
     KernelBase.dll (UWP - uses another process - not investigated):
+
     - BrokeredCreateDirectoryW
 
     KernelBase.dll (WTF?):
+
     - `CreateFileDowngrade_Win7` - 1 liner that adds a flag to a pointer passed in.
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
