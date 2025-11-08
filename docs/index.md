@@ -228,6 +228,7 @@ flowchart LR
     InternalFindFirstFileW
     FindNextFileA
     FindNextFileW
+    FindFirstStreamW
 
     FindFirstChangeNotificationA
     FindFirstChangeNotificationW
@@ -376,6 +377,8 @@ flowchart LR
     FindNextFileW --> NtQueryDirectoryFileEx
     FindFirstFileNameW --> NtCreateFile
     FindFirstFileNameW --> NtQueryInformationFile
+    FindFirstStreamW --> NtCreateFile
+    FindFirstStreamW --> NtQueryInformationFile
     FindFirstChangeNotificationW --> NtOpenFile
     FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
     CreateFileInternal --> NtCreateFile
@@ -437,6 +440,7 @@ flowchart LR
     - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from NtCreateFile , so should still be redirected nonetheless.
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
     - `DecryptFileA` / `DecryptFileW` / `EncryptFileA` / `EncryptFileW` / `FileEncryptionStatusA` / `FileEncryptionStatusW` - Not supported with any game store, or even legacy games.
+    - ✅ `FindFirstStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
     - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
 
 ??? note "Roots (as of Windows 11 25H2)"
