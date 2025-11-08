@@ -417,6 +417,7 @@ flowchart LR
     InternalSetFileAttributesW
     GetFileInformationByHandle
     GetFileInformationByHandleEx
+    SetFileInformationByHandle
     GetFileInformationByName
     GetFileSize
     GetFileSizeEx
@@ -443,6 +444,7 @@ flowchart LR
     NtQueryDirectoryFile
     NtQueryObject
     NtOpenFile
+    NtSetInformationFile
 
     GetFileAttributesExW --> NtQueryFullAttributesFile
     GetFileAttributesW --> NtQueryAttributesFile
@@ -460,6 +462,7 @@ flowchart LR
     GetFileType --> NtQueryVolumeInformationFile
     GetFinalPathNameByHandleW --> NtQueryObject
     GetFinalPathNameByHandleW --> NtQueryInformationFile
+    SetFileInformationByHandle --> NtSetInformationFile
     end
 ```
 
