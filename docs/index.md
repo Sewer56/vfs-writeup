@@ -476,7 +476,7 @@ flowchart LR
 
 ### Links & Symbolic Links
 
-Creation of hard links and symbolic links through dedicated APIs.
+Creation and enumeration of hard links and symbolic links through dedicated APIs.
 
 ```mermaid
 flowchart LR
@@ -487,22 +487,30 @@ flowchart LR
     CreateSymbolicLinkW
     CreateSymbolicLinkTransactedA
     CreateSymbolicLinkTransactedW
+    FindFirstFileNameW
+    FindNextFileNameW
+    FindParent
 
     CreateHardLinkA --> CreateHardLinkW
     CreateSymbolicLinkA --> CreateSymbolicLinkW
     CreateSymbolicLinkTransactedA --> CreateSymbolicLinkTransactedW
     CreateSymbolicLinkTransactedW --> CreateSymbolicLinkW
+    FindNextFileNameW --> FindParent
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtOpenFile
     NtCreateFile
     NtSetInformationFile
+    NtQueryInformationFile
 
     CreateHardLinkW --> NtOpenFile
     CreateHardLinkW --> NtSetInformationFile
     CreateSymbolicLinkW --> NtCreateFile
     CreateSymbolicLinkW --> NtSetInformationFile
+    FindFirstFileNameW --> NtCreateFile
+    FindFirstFileNameW --> NtQueryInformationFile
+    FindParent --> NtCreateFile
     end
 ```
 
@@ -561,14 +569,11 @@ flowchart LR
 
 ### Miscellaneous APIs
 
-Additional file operations including stream enumeration, file name enumeration, compression info, file locking, and handle cleanup.
+Additional file operations including stream enumeration, compression info, file locking, and handle cleanup.
 
 ```mermaid
 flowchart LR
     subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
-    FindFirstFileNameW
-    FindNextFileNameW
-    FindParent
     FindFirstStreamW
     FindNextStreamW
     GetCompressedFileSizeA
@@ -578,7 +583,6 @@ flowchart LR
     CloseHandle
 
     GetCompressedFileSizeA --> GetCompressedFileSizeW
-    FindNextFileNameW --> FindParent
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -588,9 +592,6 @@ flowchart LR
     NtLockFile
     NtClose
 
-    FindFirstFileNameW --> NtCreateFile
-    FindFirstFileNameW --> NtQueryInformationFile
-    FindParent --> NtCreateFile
     FindFirstStreamW --> NtCreateFile
     FindFirstStreamW --> NtQueryInformationFile
     GetCompressedFileSizeW --> NtOpenFile
@@ -636,8 +637,6 @@ flowchart LR
     - ✅ `FindFirstFileExA`
     - ✅ `FindFirstFileExW`
     - ✅ `FindFirstFileExFromAppW`
-    - ✅ `FindFirstFileNameW`
-    - ✅ `FindNextFileNameW`
     - ✅ `InternalFindFirstFileExW`
     - ✅ `InternalFindFirstFileW`
 
@@ -691,6 +690,8 @@ flowchart LR
     - ✅ `CreateHardLinkW`
     - ✅ `CreateSymbolicLinkA`
     - ✅ `CreateSymbolicLinkW`
+    - ✅ `FindFirstFileNameW`
+    - ✅ `FindNextFileNameW`
     - ✅ `DeleteFile2A`
     - ✅ `DeleteFile2W`
     - ✅ `DeleteFileA`
