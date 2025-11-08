@@ -217,7 +217,7 @@ Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
 
 !!! tip "Chart Organization"
 
-    The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points. The **[complete reference chart](#complete-api-flow-reference)** is available at the bottom.
+    The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points.
 
 ### Directory Enumeration
 
@@ -386,8 +386,6 @@ flowchart LR
     GetFileAttributesA --> GetFileAttributesW
     GetFileAttributesExA --> GetFileAttributesExW
     GetFileAttributesExFromAppW --> GetFileAttributesExW
-    RemoveDirectoryA --> RemoveDirectoryW
-    RemoveDirectoryFromAppW --> RemoveDirectoryW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesA --> SetFileAttributesW
     end
