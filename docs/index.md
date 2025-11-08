@@ -223,6 +223,9 @@ flowchart LR
     FindFirstFileW
     FindFirstFileExW
     FindFirstFileExFromAppW
+    FindFirstFileNameW
+    InternalFindFirstFileExW
+    InternalFindFirstFileW
     FindNextFileA
     FindNextFileW
 
@@ -296,9 +299,11 @@ flowchart LR
     RemoveDirectoryW
 
     %%% Win32 Internal Redirects
-    FindFirstFileA --> FindFirstFileExW
-    FindFirstFileExA --> FindFirstFileExW
+    FindFirstFileA --> InternalFindFirstFileExW
+    FindFirstFileExA --> InternalFindFirstFileW
     FindFirstFileExFromAppW --> FindFirstFileExW
+    FindFirstFileExW --> InternalFindFirstFileExW
+    FindFirstFileW --> InternalFindFirstFileW
     FindNextFileA --> FindNextFileW
     FindFirstChangeNotificationA --> FindFirstChangeNotificationW
     CreateDirectory2A --> InternalCreateDirectoryW
@@ -364,11 +369,13 @@ flowchart LR
     NtClose
 
     %%% Win32 -> NT API
-    FindFirstFileExW --> NtOpenFile
-    FindFirstFileExW --> NtQueryDirectoryFileEx
-    FindFirstFileW --> NtOpenFile
-    FindFirstFileW --> NtQueryDirectoryFileEx
+    InternalFindFirstFileExW --> NtOpenFile
+    InternalFindFirstFileExW --> NtQueryDirectoryFileEx
+    InternalFindFirstFileW --> NtOpenFile
+    InternalFindFirstFileW --> NtQueryDirectoryFileEx
     FindNextFileW --> NtQueryDirectoryFileEx
+    FindFirstFileNameW --> NtCreateFile
+    FindFirstFileNameW --> NtQueryInformationFile
     FindFirstChangeNotificationW --> NtOpenFile
     FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
     CreateFileInternal --> NtCreateFile
@@ -450,6 +457,17 @@ flowchart LR
     - ✅ `CreateFileA`
     - ✅ `CreateFileFromAppW`
     - ✅ `CreateFileW`
+
+    KernelBase.dll (File Enumeration):
+
+    - ✅ `FindFirstFileA`
+    - ✅ `FindFirstFileW`
+    - ✅ `FindFirstFileExA`
+    - ✅ `FindFirstFileExW`
+    - ✅ `FindFirstFileExFromAppW`
+    - ✅ `FindFirstFileNameW`
+    - ✅ `InternalFindFirstFileExW`
+    - ✅ `InternalFindFirstFileW`
 
     KernelBase.dll (No-op):
 
