@@ -264,6 +264,11 @@ flowchart LR
     CreateHardLinkA
     CreateHardLinkW
 
+    CreateSymbolicLinkA
+    CreateSymbolicLinkW
+    CreateSymbolicLinkTransactedA
+    CreateSymbolicLinkTransactedW
+
     CopyFileA
     CopyFileW
     CopyFile2
@@ -325,6 +330,9 @@ flowchart LR
     CreateFileMappingNumaA --> CreateFileMappingNumaW
     CreateFileMappingFromApp --> CreateFileMappingNumaW
     CreateHardLinkA --> CreateHardLinkW
+    CreateSymbolicLinkA --> CreateSymbolicLinkW
+    CreateSymbolicLinkTransactedA --> CreateSymbolicLinkTransactedW
+    CreateSymbolicLinkTransactedW --> CreateSymbolicLinkW
     CopyFileA --> CopyFileW
     CopyFileW --> CopyFileExW
     CopyFileExA --> CopyFileExW
@@ -335,7 +343,7 @@ flowchart LR
     CopyFileTransactedW --> CopyFileExW
     end
 
-    subgraph NT API
+    subgraph NT API["NT API (ntdll.dll/ntoskrnl.exe)"]
     %% Definitions
     NtCreateFile
     NtOpenFile
@@ -377,6 +385,8 @@ flowchart LR
     CreateFileMappingW --> NtCreateSection
     CreateHardLinkW --> NtOpenFile
     CreateHardLinkW --> NtSetInformationFile
+    CreateSymbolicLinkW --> NtCreateFile
+    CreateSymbolicLinkW --> NtSetInformationFile
     BasepCopyFileExW --> NtCreateFile
     BasepCopyFileExW --> NtQueryInformationFile
     BasepCopyFileExW --> NtSetInformationFile
@@ -410,8 +420,9 @@ flowchart LR
 
 ??? note "Notable Functions we probably won't ever need but FYI"
 
-    - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions.
+    - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from NtCreateFile , so should still be redirected nonetheless.
     - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
+    - `DecryptFileA` / `DecryptFileW` / `EncryptFileA` / `EncryptFileW` / `FileEncryptionStatusA` / `FileEncryptionStatusW` - Not supported with any game store, or even legacy games.
     - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
 
 ??? note "Roots (as of Windows 11 25H2)"
@@ -458,6 +469,8 @@ flowchart LR
 
     - ✅ `CreateHardLinkA`
     - ✅ `CreateHardLinkW`
+    - ✅ `CreateSymbolicLinkA`
+    - ✅ `CreateSymbolicLinkW`
     - ✅ `DeleteFile2A`
     - ✅ `DeleteFile2W`
     - ✅ `DeleteFileA`
@@ -478,6 +491,8 @@ flowchart LR
     - ✅ `CreateDirectoryTransactedW`
     - ✅ `CreateFileTransactedA`
     - ✅ `CreateFileTransactedW`
+    - ✅ `CreateSymbolicLinkTransactedA`
+    - ✅ `CreateSymbolicLinkTransactedW`
 
     KernelBase.dll (UWP - uses another process - not investigated):
 
