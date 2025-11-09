@@ -345,6 +345,8 @@ flowchart LR
     RemoveDirectoryA
     RemoveDirectoryFromAppW
     RemoveDirectoryW
+    RemoveDirectoryTransactedA
+    RemoveDirectoryTransactedW
     InternalRemoveDirectoryW
 
     DeleteFile2A --> InternalDeleteFileW
@@ -356,6 +358,8 @@ flowchart LR
     RemoveDirectory2W --> InternalRemoveDirectoryW
     RemoveDirectoryA --> RemoveDirectoryW
     RemoveDirectoryFromAppW --> RemoveDirectoryW
+    RemoveDirectoryTransactedA --> RemoveDirectoryTransactedW
+    RemoveDirectoryTransactedW --> RemoveDirectoryW
     RemoveDirectoryW --> InternalRemoveDirectoryW
     end
 
