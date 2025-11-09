@@ -286,6 +286,7 @@ flowchart LR
     CreateDirectoryFromAppW
     CreateDirectoryTransactedA
     CreateDirectoryTransactedW
+    OpenFileById
 
     CreateDirectory2A --> InternalCreateDirectoryW
     CreateDirectory2W --> InternalCreateDirectoryW
@@ -322,6 +323,7 @@ flowchart LR
     CreateDirectoryExW --> NtQueryInformationFile
     CreateDirectoryExW --> NtCreateFile
     CreateDirectoryExW --> NtSetInformationFile
+    OpenFileById --> NtCreateFile
     end
 ```
 
