@@ -438,6 +438,7 @@ flowchart LR
     GetFileAttributesExW
     GetFileAttributesW
     SetFileAttributesA
+    SetFileAttributesFromAppA
     SetFileAttributesFromAppW
     SetFileAttributesW
     InternalSetFileAttributesW
@@ -448,6 +449,7 @@ flowchart LR
     GetFileSize
     GetFileSizeEx
     GetFileTime
+    SetFileTime
     GetFileType
     GetCompressedFileSizeA
     GetCompressedFileSizeW
@@ -458,6 +460,7 @@ flowchart LR
     GetFileAttributesExA --> GetFileAttributesExW
     GetFileAttributesExFromAppW --> GetFileAttributesExW
     SetFileAttributesA --> SetFileAttributesW
+    SetFileAttributesFromAppA --> SetFileAttributesW
     SetFileAttributesFromAppW --> SetFileAttributesW
     SetFileAttributesW --> InternalSetFileAttributesW
     GetCompressedFileSizeA --> GetCompressedFileSizeW
@@ -494,6 +497,7 @@ flowchart LR
     GetFinalPathNameByHandleW --> NtQueryObject
     GetFinalPathNameByHandleW --> NtQueryInformationFile
     SetFileInformationByHandle --> NtSetInformationFile
+    SetFileTime --> NtSetInformationFile
     end
 ```
 
