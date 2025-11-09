@@ -225,9 +225,9 @@ When game opens 'game/player.model':
 
 !!! tip "Chart Organization"
 
-     The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points.
+    The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points.
 
-#### Directory Enumeration
+### Directory Enumeration
 
 All `FindFirst*` and `FindNext*` APIs converge through internal functions to `NtQueryDirectoryFileEx` for directory listing operations.
 
@@ -265,10 +265,263 @@ flowchart LR
     InternalFindFirstFileW --> NtOpenFile
     InternalFindFirstFileW --> NtQueryDirectoryFileEx
     FindNextFileW --> NtQueryDirectoryFileEx
-end
+    end
 ```
 
-#### File Copy, Move & Replace Operations
+### File & Directory Creation
+
+All `CreateFile*` and `CreateDirectory*` APIs funnel through internal functions to `NtCreateFile`, along with optional metadata operations.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CreateDirectory2A
+    CreateDirectory2W
+    CreateDirectoryA
+    CreateDirectoryW
+    InternalCreateDirectoryW
+    InternalCreateDirectoryW_Old
+    CreateFileA
+    CreateFileW
+    CreateFile2
+    CreateFile3
+    CreateFileInternal
+    CreateFile2FromAppW
+    CreateFileFromAppW
+    CreateFileTransactedA
+    CreateFileTransactedW
+    CreateDirectoryExW
+    CreateDirectoryFromAppW
+    CreateDirectoryTransactedA
+    CreateDirectoryTransactedW
+    OpenFileById
+    ReOpenFile
+
+    CreateDirectory2A --> InternalCreateDirectoryW
+    CreateDirectory2W --> InternalCreateDirectoryW
+    CreateDirectoryA --> CreateDirectoryW
+    CreateDirectoryW --> InternalCreateDirectoryW
+    CreateDirectoryW --> InternalCreateDirectoryW_Old
+    CreateDirectoryTransactedA --> CreateDirectoryTransactedW
+    CreateDirectoryTransactedW --> CreateDirectoryW
+    CreateDirectoryTransactedW --> CreateDirectoryExW
+    CreateFileA --> CreateFileInternal
+    CreateFileW --> CreateFileInternal
+    CreateFile2 --> CreateFileInternal
+    CreateFile3 --> CreateFileInternal
+    CreateFile2FromAppW --> CreateFile2
+    CreateFileTransactedA --> CreateFileTransactedW
+    CreateFileTransactedW --> CreateFileW
+    CreateDirectoryFromAppW --> CreateDirectoryW
+    CreateFileFromAppW --> CreateFile2FromAppW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtCreateFile
+    NtSetInformationFile
+    NtQueryInformationFile
+    NtOpenFile
+
+    CreateFileInternal --> NtCreateFile
+    CreateFileInternal --> NtSetInformationFile
+    CreateFileInternal --> NtQueryInformationFile
+    CreateDirectoryW --> NtCreateFile
+    InternalCreateDirectoryW --> NtCreateFile
+    InternalCreateDirectoryW_Old --> NtCreateFile
+    CreateDirectoryExW --> NtOpenFile
+    CreateDirectoryExW --> NtQueryInformationFile
+    CreateDirectoryExW --> NtCreateFile
+    CreateDirectoryExW --> NtSetInformationFile
+    OpenFileById --> NtCreateFile
+    ReOpenFile --> NtCreateFile
+    end
+```
+
+!!! info "ReOpenFile"
+
+    Operates on existing handle (already redirected). No path redirection needed.
+
+### File & Directory Deletion
+
+All deletion APIs (`DeleteFile*` and `RemoveDirectory*`) converge through internal functions (`InternalDeleteFileW` and `InternalRemoveDirectoryW`) to NT-level operations.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    DeleteFile2A
+    DeleteFile2W
+    DeleteFileA
+    DeleteFileW
+    DeleteFileFromAppW
+    InternalDeleteFileW
+    RemoveDirectory2A
+    RemoveDirectory2W
+    RemoveDirectoryA
+    RemoveDirectoryFromAppW
+    RemoveDirectoryW
+    RemoveDirectoryTransactedA
+    RemoveDirectoryTransactedW
+    InternalRemoveDirectoryW
+
+    DeleteFile2A --> InternalDeleteFileW
+    DeleteFile2W --> InternalDeleteFileW
+    DeleteFileFromAppW --> DeleteFileW
+    DeleteFileA --> DeleteFileW
+    DeleteFileW --> InternalDeleteFileW
+    RemoveDirectory2A --> InternalRemoveDirectoryW
+    RemoveDirectory2W --> InternalRemoveDirectoryW
+    RemoveDirectoryA --> RemoveDirectoryW
+    RemoveDirectoryFromAppW --> RemoveDirectoryW
+    RemoveDirectoryTransactedA --> RemoveDirectoryTransactedW
+    RemoveDirectoryTransactedW --> RemoveDirectoryW
+    RemoveDirectoryW --> InternalRemoveDirectoryW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtOpenFile
+    NtQueryInformationFile
+    NtSetInformationFile
+
+    InternalDeleteFileW --> NtOpenFile
+    InternalDeleteFileW --> NtQueryInformationFile
+    InternalDeleteFileW --> NtSetInformationFile
+    InternalRemoveDirectoryW --> NtOpenFile
+    InternalRemoveDirectoryW --> NtQueryInformationFile
+    InternalRemoveDirectoryW --> NtSetInformationFile
+    end
+```
+
+### Read/Write Operations
+
+All file read and write operations, including file pointer positioning and file size modification, funnel through NT-level read/write APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    ReadFile
+    ReadFileEx
+    ReadFileScatter
+    WriteFile
+    WriteFileEx
+    WriteFileGather
+    SetFilePointer
+    SetFilePointerEx
+    SetEndOfFile
+
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtReadFile
+    NtReadFileScatter
+    NtWriteFile
+    NtWriteFileGather
+    NtQueryInformationFile
+    NtSetInformationFile
+
+    ReadFile --> NtReadFile
+    ReadFileEx --> NtReadFile
+    ReadFileScatter --> NtReadFileScatter
+    WriteFile --> NtWriteFile
+    WriteFileEx --> NtWriteFile
+    WriteFileGather --> NtWriteFileGather
+    SetFilePointer --> NtQueryInformationFile
+    SetFilePointer --> NtSetInformationFile
+    SetFilePointerEx --> NtQueryInformationFile
+    SetFilePointerEx --> NtSetInformationFile
+    SetEndOfFile --> NtQueryInformationFile
+    SetEndOfFile --> NtSetInformationFile
+    end
+```
+
+### File Attributes
+
+Query and modification of file attributes. Path-based queries use `GetFileAttributes*` and `SetFileAttributes*` APIs, handle-based queries use `GetFileInformationByHandle*` APIs, and name-based queries use `GetFileInformationByName`.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    GetFileAttributesA
+    GetFileAttributesExA
+    GetFileAttributesExFromAppW
+    GetFileAttributesExW
+    GetFileAttributesW
+    SetFileAttributesA
+    SetFileAttributesFromAppA
+    SetFileAttributesFromAppW
+    SetFileAttributesW
+    InternalSetFileAttributesW
+    GetFileInformationByHandle
+    GetFileInformationByHandleEx
+    SetFileInformationByHandle
+    GetFileInformationByName
+    GetFileSize
+    GetFileSizeEx
+    GetFileTime
+    SetFileTime
+    GetFileType
+    GetCompressedFileSizeA
+    GetCompressedFileSizeW
+    GetFinalPathNameByHandleA
+    GetFinalPathNameByHandleW
+
+    GetFileAttributesA --> GetFileAttributesW
+    GetFileAttributesExA --> GetFileAttributesExW
+    GetFileAttributesExFromAppW --> GetFileAttributesExW
+    SetFileAttributesA --> SetFileAttributesW
+    SetFileAttributesFromAppA --> SetFileAttributesW
+    SetFileAttributesFromAppW --> SetFileAttributesW
+    SetFileAttributesW --> InternalSetFileAttributesW
+    GetCompressedFileSizeA --> GetCompressedFileSizeW
+    GetFinalPathNameByHandleA --> GetFinalPathNameByHandleW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtQueryAttributesFile
+    NtQueryFullAttributesFile
+    NtQueryInformationFile
+    NtQueryInformationByName
+    NtQueryVolumeInformationFile
+    NtQueryDirectoryFile
+    NtQueryObject
+    NtOpenFile
+    NtSetInformationFile
+
+    GetFileAttributesExW --> NtQueryFullAttributesFile
+    GetFileAttributesW --> NtQueryAttributesFile
+    InternalSetFileAttributesW --> NtOpenFile
+    InternalSetFileAttributesW --> NtSetInformationFile
+    GetFileInformationByHandle --> NtQueryVolumeInformationFile
+    GetFileInformationByHandle --> NtQueryInformationFile
+    GetFileInformationByHandleEx --> NtQueryDirectoryFile
+    GetFileInformationByHandleEx --> NtQueryInformationFile
+    GetFileInformationByHandleEx --> NtQueryVolumeInformationFile
+    GetFileInformationByName --> NtQueryInformationByName
+    GetFileSize --> NtQueryInformationFile
+    GetFileSizeEx --> NtQueryInformationFile
+    GetFileTime --> NtQueryInformationFile
+    GetFileType --> NtQueryVolumeInformationFile
+    GetCompressedFileSizeW --> NtOpenFile
+    GetCompressedFileSizeW --> NtQueryInformationFile
+    GetFinalPathNameByHandleW --> NtQueryObject
+    GetFinalPathNameByHandleW --> NtQueryInformationFile
+    SetFileInformationByHandle --> NtSetInformationFile
+    SetFileTime --> NtSetInformationFile
+    end
+```
+
+!!! info "NtQueryVolumeInformationFile does not need emulation"
+
+    `NtQueryVolumeInformationFile` queries volume-level information (filesystem type, serial number, etc.) rather than individual file metadata. Since we're not virtualizing entire volumes, this API can pass through without interception.
+
+!!! info "GetCompressedFileSize* APIs"
+
+    `GetCompressedFileSizeA` and `GetCompressedFileSizeW` query the on-disk size of NTFS compressed files (which differs from logical file size for compressed files). For virtual files, return the regular file size. For redirected files, simply redirect the path and let the underlying file system report its compressed size.
+
+!!! info "GetFileVersion* APIs"
+
+    `GetFileVersionInfoA`, `GetFileVersionInfoW`, `GetFileVersionInfoExA`, `GetFileVersionInfoExW`, and related APIs extract embedded version resources from PE files. These are handled by the standard file read/open APIs (`NtCreateFile`, `NtReadFile`) and don't require separate hooking.
+
+### File Copy, Move & Replace Operations
 
 All `CopyFile*` variants converge through `BasepCopyFileExW`. `MoveFile*` variants converge through `MoveFileWithProgressTransactedW` or `MoveFileWithProgressW`, with some move operations delegating to copy for cross-volume moves. `ReplaceFile*` variants converge through `ReplaceFileExInternal`.
 
@@ -346,7 +599,7 @@ flowchart LR
     end
 ```
 
-#### Links & Symbolic Links
+### Links & Symbolic Links
 
 Creation and enumeration of hard links and symbolic links through dedicated APIs.
 
@@ -386,7 +639,7 @@ flowchart LR
     end
 ```
 
-#### Memory Mapped Files
+### Memory Mapped Files
 
 All `CreateFileMapping*` APIs for memory-mapped file creation converge to NT section APIs.
 
@@ -413,7 +666,7 @@ flowchart LR
     end
 ```
 
-#### Change Notifications
+### Change Notifications
 
 Directory change monitoring APIs for tracking file system modifications.
 
@@ -443,7 +696,7 @@ flowchart LR
     end
 ```
 
-#### Handle Lifetime Management
+### Handle Lifetime Management
 
 Handle cleanup operations that need hooking for internal state tracking.
 
@@ -463,9 +716,9 @@ flowchart LR
 
 !!! info "Why hook NtClose?"
 
-     We need to hook `NtClose` for lifetime management - tracking when file handles are closed to clean up internal VFS state.
+    We need to hook `NtClose` for lifetime management - tracking when file handles are closed to clean up internal VFS state.
 
-#### Notable Functions (Not Relevant for Games)
+### Notable Functions (Not Relevant for Games)
 
 !!! info "We don't care about these APIs"
 
