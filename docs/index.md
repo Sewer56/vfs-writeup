@@ -640,6 +640,8 @@ flowchart LR
     FindFirstChangeNotificationA
     FindFirstChangeNotificationW
     FindNextChangeNotification
+    ReadDirectoryChangesW
+    ReadDirectoryChangesExW
 
     FindFirstChangeNotificationA --> FindFirstChangeNotificationW
     end
@@ -653,6 +655,8 @@ flowchart LR
     FindFirstChangeNotificationW --> NtNotifyChangeDirectoryFile
     FindNextChangeNotification --> NtNotifyChangeDirectoryFile
     NtNotifyChangeDirectoryFile --> NtNotifyChangeDirectoryFileEx
+    ReadDirectoryChangesW --> NtNotifyChangeDirectoryFileEx
+    ReadDirectoryChangesExW --> NtNotifyChangeDirectoryFileEx
     end
 ```
 
