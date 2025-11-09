@@ -189,7 +189,12 @@ When game opens 'game/player.model':
   5. Layer 2 passes data back to game
 ```
 
-## Hook Endpoints (Windows)
+## Windows Filesystem Architecture
+
+!!! info "This section documents the Windows filesystem API architecture"
+
+    Understanding how Win32 APIs funnel down to NT APIs is essential for implementing the VFS.
+    This is architectural context, not implementation details.
 
 Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
 
@@ -850,9 +855,11 @@ flowchart LR
     
     **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behavior.
 
-## Hook Endpoints (Linux)
+## Linux Filesystem Architecture
 
-!!! info "Native Linux games, not Wine. Wine is covered by Windows."
+!!! info "This section documents the Linux filesystem architecture for native Linux games"
+
+    Native Linux games, not Wine. Wine is covered by Windows section above.
 
 Normally on operating systems, you perform a 'syscall' to request services from the kernel. On Windows, this is abstracted away by `ntdll.dll` APIs; since the order of the syscalls can change between Windows versions.
 
@@ -874,9 +881,13 @@ This stuff requires some low level knowledge but is rather trivial for me (Sewer
 
     As a result, the actual VFS implementation itself would be much simpler on Linux than on Windows.
 
-## Layer 1: Virtual FileSystem
+## Layer 1 Hook Endpoints
 
 !!! info "Reminder: [Layer 1 deals with the 'where' problem](#layer-1-virtual-filesystem)"
+
+    This section documents the specific APIs hooked by Layer 1 for each platform.
+
+### Windows
 
 - **`NtCreateFile`** & **`NtOpenFile`**
     - Intercept file creation/open operations. 
@@ -897,35 +908,52 @@ If/when we implement write support, we would also hook APIs such as:
 
 - **`NtDeleteFile`** - Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
 
-## Layer 2: File Emulation Framework
+### Linux
+
+!!! info "TODO: Document Linux syscalls for Layer 1"
+
+    This section will document the Linux syscalls hooked by Layer 1.
+
+## Layer 2 Hook Endpoints
+
+!!! info "Reminder: [Layer 2 deals with the 'what' problem](#layer-2-virtual-file-framework)"
+
+    Layer 2 handles virtual file data synthesis and read operations. It manages the actual
+    file content that gets returned when virtual files are accessed.
 
 ### What It Does
 
-Synthesizes file data on-the-fly by intercepting read operations. Instead of returning data from disk, Layer 2 generates the file content dynamically by merging data from multiple sources.
+Handles all operations on virtual files once they're opened. Layer 2 intercepts data operations (reads, seeks, etc.) and manages the lifecycle of virtual file handles. It works with `fileHandler` objects provided by Layer 3 extensions to synthesize file content on-the-fly.
 
-Uses Layer 1 to make emulated files visible in directory searches and to handle path routing.
+Uses Layer 1 to make virtual files visible in directory searches and to handle path routing.
 
-### Hooked APIs
+### Windows
 
-- **`NtCreateFile` & `NtOpenFile`** - Detect when an emulated file is being opened. Match the file path against registered emulator routes. If matched, call into the emulator's `try_create_file` method to initialize emulator state and create internal data structures for synthesizing the file.
+- **`NtCreateFile` & `NtOpenFile`** - Detect when a virtual file is being opened. Look up the registered `fileHandler` for this path and initialize state for managing read operations.
 
-- **`NtReadFile`** - Intercept file read operations. If the file is being emulated, use the StreamSlice array to determine where data comes from. Read from source files/locations and return synthesized data instead of the original file data.
+- **`NtReadFile`** - Intercept file read operations. If the file is virtual, delegate to the `fileHandler` to provide the actual data at the requested offset.
 
-- **`NtSetInformationFile`** - Intercept handle update operations. Track file pointer position updates (seek operations). Emulated files need to maintain their own file pointer state so that read operations know where to read from.
+- **`NtSetInformationFile`** - Intercept handle update operations. Track file pointer position updates (seek operations). Virtual files need to maintain their own file pointer state.
 
-- **`NtQueryInformationFile`** - Intercept file information queries. Report the emulated file's size and attributes. The emulated file size may differ from the original file on disk.
+- **`NtQueryInformationFile`** - Intercept file information queries. Report the virtual file's size and attributes from the registered metadata.
 
-- **`NtQueryFullAttributesFile`** - Intercept file attribute queries. Report the emulated file's size and full attributes. Used when applications check file metadata without opening the file.
+- **`NtQueryFullAttributesFile`** - Intercept file attribute queries. Report the virtual file's size and full attributes. Used when applications check file metadata without opening the file.
 
-- **`NtClose`** - Intercept file close operations. Dispose of emulator internal state for the emulated file (such as current read offset). Free internal data structures for that emulated file instance.
+- **`NtClose`** - Intercept file close operations. Dispose of virtual file state (such as current read offset). Free internal data structures for that virtual file instance.
 
 **[→ Complete Hook Details](File-Emulation-Framework/Implementation-Details/Hooks.md)**
 
+### Linux
+
+!!! info "TODO: Document Linux syscalls for Layer 2"
+
+    This section will document the Linux syscalls hooked by Layer 2.
+
 ### Dependencies on Layer 1
 
-- Calls `RegisterVirtualFile()` to make emulated files visible in directory listings
-- Leverages Layer 1's redirect system for route-based file targeting
+- Calls `RegisterVirtualFile()` to make virtual files visible in directory listings
 - Layer 1 handles the path redirection; Layer 2 handles the data synthesis
+- Layer 1 makes virtual files appear in searches; Layer 2 provides their content
 
 ## How does this compare with my previous work?
 
