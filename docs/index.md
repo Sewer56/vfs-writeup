@@ -287,6 +287,7 @@ flowchart LR
     CreateDirectoryTransactedA
     CreateDirectoryTransactedW
     OpenFileById
+    ReOpenFile
 
     CreateDirectory2A --> InternalCreateDirectoryW
     CreateDirectory2W --> InternalCreateDirectoryW
@@ -324,8 +325,13 @@ flowchart LR
     CreateDirectoryExW --> NtCreateFile
     CreateDirectoryExW --> NtSetInformationFile
     OpenFileById --> NtCreateFile
+    ReOpenFile --> NtCreateFile
     end
 ```
+
+!!! info "ReOpenFile"
+
+    Operates on existing handle (already redirected). No path redirection needed.
 
 ### File & Directory Deletion
 
