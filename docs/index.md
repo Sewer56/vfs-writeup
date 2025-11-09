@@ -509,9 +509,9 @@ flowchart LR
 
     `GetFileVersionInfoA`, `GetFileVersionInfoW`, `GetFileVersionInfoExA`, `GetFileVersionInfoExW`, and related APIs extract embedded version resources from PE files. These are handled by the standard file read/open APIs (`NtCreateFile`, `NtReadFile`) and don't require separate hooking.
 
-### File Copy & Move Operations
+### File Copy, Move & Replace Operations
 
-All `CopyFile*` variants converge through `BasepCopyFileExW`. `MoveFile*` variants converge through `MoveFileWithProgressTransactedW` or `MoveFileWithProgressW`, with some move operations delegating to copy for cross-volume moves.
+All `CopyFile*` variants converge through `BasepCopyFileExW`. `MoveFile*` variants converge through `MoveFileWithProgressTransactedW` or `MoveFileWithProgressW`, with some move operations delegating to copy for cross-volume moves. `ReplaceFile*` variants converge through `ReplaceFileExInternal`.
 
 ```mermaid
 flowchart LR
@@ -535,6 +535,10 @@ flowchart LR
     MoveFileWithProgressTransactedA
     MoveFileWithProgressTransactedW
     MoveFileFromAppW
+    ReplaceFileA
+    ReplaceFileW
+    ReplaceFileFromAppW
+    ReplaceFileExInternal
     BasepCopyFileExW
 
     CopyFileA --> CopyFileW
@@ -556,6 +560,9 @@ flowchart LR
     MoveFileFromAppW --> MoveFileWithProgressW
     MoveFileWithProgressW --> MoveFileWithProgressTransactedW
     MoveFileWithProgressTransactedW --> BasepCopyFileExW
+    ReplaceFileA --> ReplaceFileW
+    ReplaceFileW --> ReplaceFileExInternal
+    ReplaceFileFromAppW --> ReplaceFileW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -563,6 +570,8 @@ flowchart LR
     NtOpenFile
     NtQueryInformationFile
     NtSetInformationFile
+    NtFsControlFile
+    NtQueryVolumeInformationFile
 
     BasepCopyFileExW --> NtCreateFile
     BasepCopyFileExW --> NtQueryInformationFile
@@ -570,6 +579,11 @@ flowchart LR
     MoveFileWithProgressTransactedW --> NtOpenFile
     MoveFileWithProgressTransactedW --> NtQueryInformationFile
     MoveFileWithProgressTransactedW --> NtSetInformationFile
+    ReplaceFileExInternal --> NtOpenFile
+    ReplaceFileExInternal --> NtFsControlFile
+    ReplaceFileExInternal --> NtQueryInformationFile
+    ReplaceFileExInternal --> NtSetInformationFile
+    ReplaceFileExInternal --> NtQueryVolumeInformationFile
     end
 ```
 
