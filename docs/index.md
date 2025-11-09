@@ -381,6 +381,9 @@ flowchart LR
     ReadFile
     ReadFileEx
     ReadFileScatter
+    WriteFile
+    WriteFileEx
+    WriteFileGather
     SetFilePointer
     SetFilePointerEx
     SetEndOfFile
@@ -390,12 +393,17 @@ flowchart LR
     subgraph NT["NT API (ntdll.dll)"]
     NtReadFile
     NtReadFileScatter
+    NtWriteFile
+    NtWriteFileGather
     NtQueryInformationFile
     NtSetInformationFile
 
     ReadFile --> NtReadFile
     ReadFileEx --> NtReadFile
     ReadFileScatter --> NtReadFileScatter
+    WriteFile --> NtWriteFile
+    WriteFileEx --> NtWriteFile
+    WriteFileGather --> NtWriteFileGather
     SetFilePointer --> NtQueryInformationFile
     SetFilePointer --> NtSetInformationFile
     SetFilePointerEx --> NtQueryInformationFile
