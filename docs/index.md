@@ -810,7 +810,31 @@ flowchart LR
     
     **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behavior.
 
-### Layer 1: Virtual FileSystem
+## Hook Endpoints (Linux)
+
+!!! info "Native Linux games, not Wine. Wine is covered by Windows."
+
+Normally on operating systems, you perform a 'syscall' to request services from the kernel. On Windows, this is abstracted away by `ntdll.dll` APIs; since the order of the syscalls can change between Windows versions.
+
+On Linux, there is a stable order of syscalls, so programs can syscall directly. Usually, doing these syscalls is abstracted away by `libc` (e.g. `glibc`); so you never write them directly.
+
+With that in mind, there are 3 options for hooking file I/O on native Linux:
+
+1. Hook `libc` (i.e. `glibc`). Will work for ~99% of the programs out there. But some can syscall directly; e.g. Zig programs or those where libc is statically linked into the binary, i.e. `musl` instead of `glibc`.
+2. Directly patch [syscalls](https://syscalls.mebeim.net/?table=x86/64/x64/latest) for every loaded in library. 100% coverage. We add a jump to our hook function if we know the syscall number. If we don't, we check it in the hook.
+3. Use `ptrace` to intercept syscalls at the kernel boundary. This is the 'officially' supported solution, but has notable performance overhead; and not every distro will have `ptrace` allowed out the box. This is what `Snap` does on Ubuntu; and is probably part the reason people complain about startup times.
+
+The ***objectively correct*** solution is Option 2 given our requirements. (Performance + Coverage). A tiny bit of assembly is required, i.e. We run a disassembler on every loaded library (`.so` file) to find syscall instructions and patch them to jump to our hook functions. 
+
+This would need to be done for every arch we want to support (i.e. Aarch64, x86_64, etc.). After first arch is added (x86_64), additional arch(es) would take around a day to support; provided nothing unexpected happens (shouldn't).
+
+This stuff requires some low level knowledge but is rather trivial for me (Sewer).
+
+!!! tip "As for the rest, on Linux, the file I/O syscalls are way simpler than the APIs in Windows."
+
+    As a result, the actual VFS implementation itself would be much simpler on Linux than on Windows.
+
+## Layer 1: Virtual FileSystem
 
 !!! info "Reminder: [Layer 1 deals with the 'where' problem](#layer-1-virtual-filesystem)"
 
