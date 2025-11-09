@@ -227,7 +227,7 @@ When game opens 'game/player.model':
 
     The API flow charts are split into logical groups based on functionality and dependencies. Each chart shows how Win32 APIs funnel down to NT API entry points.
 
-### Directory Enumeration
+#### Directory Enumeration
 
 All `FindFirst*` and `FindNext*` APIs converge through internal functions to `NtQueryDirectoryFileEx` for directory listing operations.
 
@@ -268,7 +268,7 @@ flowchart LR
     end
 ```
 
-### File & Directory Creation
+#### File & Directory Creation
 
 All `CreateFile*` and `CreateDirectory*` APIs funnel through internal functions to `NtCreateFile`, along with optional metadata operations.
 
@@ -341,7 +341,7 @@ flowchart LR
 
     Operates on existing handle (already redirected). No path redirection needed.
 
-### File & Directory Deletion
+#### File & Directory Deletion
 
 All deletion APIs (`DeleteFile*` and `RemoveDirectory*`) converge through internal functions (`InternalDeleteFileW` and `InternalRemoveDirectoryW`) to NT-level operations.
 
@@ -391,7 +391,7 @@ flowchart LR
     end
 ```
 
-### Read/Write Operations
+#### Read/Write Operations
 
 All file read and write operations, including file pointer positioning and file size modification, funnel through NT-level read/write APIs.
 
@@ -433,7 +433,7 @@ flowchart LR
     end
 ```
 
-### File Attributes
+#### File Attributes
 
 Query and modification of file attributes. Path-based queries use `GetFileAttributes*` and `SetFileAttributes*` APIs, handle-based queries use `GetFileInformationByHandle*` APIs, and name-based queries use `GetFileInformationByName`.
 
@@ -521,7 +521,7 @@ flowchart LR
 
     `GetFileVersionInfoA`, `GetFileVersionInfoW`, `GetFileVersionInfoExA`, `GetFileVersionInfoExW`, and related APIs extract embedded version resources from PE files. These are handled by the standard file read/open APIs (`NtCreateFile`, `NtReadFile`) and don't require separate hooking.
 
-### File Copy, Move & Replace Operations
+#### File Copy, Move & Replace Operations
 
 All `CopyFile*` variants converge through `BasepCopyFileExW`. `MoveFile*` variants converge through `MoveFileWithProgressTransactedW` or `MoveFileWithProgressW`, with some move operations delegating to copy for cross-volume moves. `ReplaceFile*` variants converge through `ReplaceFileExInternal`.
 
@@ -599,7 +599,7 @@ flowchart LR
     end
 ```
 
-### Links & Symbolic Links
+#### Links & Symbolic Links
 
 Creation and enumeration of hard links and symbolic links through dedicated APIs.
 
@@ -639,7 +639,7 @@ flowchart LR
     end
 ```
 
-### Memory Mapped Files
+#### Memory Mapped Files
 
 All `CreateFileMapping*` APIs for memory-mapped file creation converge to NT section APIs.
 
@@ -666,7 +666,7 @@ flowchart LR
     end
 ```
 
-### Change Notifications
+#### Change Notifications
 
 Directory change monitoring APIs for tracking file system modifications.
 
@@ -696,7 +696,7 @@ flowchart LR
     end
 ```
 
-### Handle Lifetime Management
+#### Handle Lifetime Management
 
 Handle cleanup operations that need hooking for internal state tracking.
 
@@ -718,7 +718,7 @@ flowchart LR
 
     We need to hook `NtClose` for lifetime management - tracking when file handles are closed to clean up internal VFS state.
 
-### Notable Functions (Not Relevant for Games)
+#### Notable Functions (Not Relevant for Games)
 
 !!! info "We don't care about these APIs"
 
