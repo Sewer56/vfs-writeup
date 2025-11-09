@@ -620,9 +620,37 @@ flowchart LR
     end
 ```
 
-### Miscellaneous APIs
+### Handle Lifetime Management
 
-Additional file operations including stream enumeration, file locking, and handle cleanup.
+Handle cleanup operations that need hooking for internal state tracking.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CloseHandle
+
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtClose
+
+    CloseHandle --> NtClose
+    end
+```
+
+!!! info "Why hook NtClose?"
+
+    We need to hook `NtClose` for lifetime management - tracking when file handles are closed to clean up internal VFS state.
+
+### Notable Functions (Not Relevant for Games)
+
+!!! info "We don't care about these APIs"
+
+    The following APIs are documented for completeness but are **not relevant** for game modding:
+    
+    - They have not been used in games
+    - They have no reason to be used in games  
+    - Game stores don't support these features
 
 ```mermaid
 flowchart LR
@@ -631,37 +659,61 @@ flowchart LR
     FindNextStreamW
     LockFile
     LockFileEx
-    CloseHandle
+    UnlockFile
+    UnlockFileEx
+    DecryptFileA
+    DecryptFileW
+    EncryptFileA
+    EncryptFileW
+    FileEncryptionStatusA
+    FileEncryptionStatusW
+    GetFileSecurityA
+    GetFileSecurityW
+    SetFileSecurityA
+    SetFileSecurityW
 
+    DecryptFileA --> DecryptFileW
+    EncryptFileA --> EncryptFileW
+    FileEncryptionStatusA --> FileEncryptionStatusW
+    GetFileSecurityA --> GetFileSecurityW
+    SetFileSecurityA --> SetFileSecurityW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtCreateFile
     NtQueryInformationFile
+    NtSetInformationFile
     NtLockFile
-    NtClose
+    NtUnlockFile
+    NtQueryEaFile
+    NtFsControlFile
+    NtQuerySecurityObject
+    NtSetSecurityObject
 
     FindFirstStreamW --> NtCreateFile
     FindFirstStreamW --> NtQueryInformationFile
     LockFile --> NtLockFile
     LockFileEx --> NtLockFile
-    CloseHandle --> NtClose
+    UnlockFile --> NtUnlockFile
+    UnlockFileEx --> NtUnlockFile
+    DecryptFileW --> NtCreateFile
+    DecryptFileW --> NtSetInformationFile
+    EncryptFileW --> NtCreateFile
+    EncryptFileW --> NtSetInformationFile
+    FileEncryptionStatusW --> NtQueryInformationFile
+    GetFileSecurityW --> NtQuerySecurityObject
+    SetFileSecurityW --> NtSetSecurityObject
     end
 ```
 
-??? info "Notable Functions we probably won't ever need but FYI"
+**What are these APIs:**
 
-    - `NtFsControlFile` - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from NtCreateFile , so should still be redirected nonetheless.
-    - `NtQueryEaFile` - Extended Attributes. DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it. Only kernel side `ZwQueryEaFile` is publicly documented by MSFT.
-    - `DecryptFileA` / `DecryptFileW` / `EncryptFileA` / `EncryptFileW` / `FileEncryptionStatusA` / `FileEncryptionStatusW` - Not supported with any game store, or even legacy games.
-    - `GetFileSecurityA` / `GetFileSecurityW` / `SetFileSecurityA` / `SetFileSecurityW` / `GetSecurityInfo` / `SetSecurityInfo` / `GetNamedSecurityInfoA` / `GetNamedSecurityInfoW` / `SetNamedSecurityInfoA` / `SetNamedSecurityInfoW` - Security descriptor and ACL management. Not supported with any game store, or even legacy games.
-    - ✅ `FindFirstStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
-    - ✅ `FindNextStreamW` - NTFS Alternate Data Streams. Games don't use this feature.
-    - ✅ `BasepCopyFileExW` - (omitted a few sub-functions due to duplicated Ntdll call target)
-
-    KernelBase.dll (WTF?):
-
-    - `CreateFileDowngrade_Win7` - 1 liner that adds a flag to a pointer passed in.
+- **NTFS Alternate Data Streams** (`FindFirstStreamW`, `FindNextStreamW`) - Unsupported by game stores.
+- **File Locking** (`LockFile`, `LockFileEx`, `UnlockFile`, `UnlockFileEx`) - Never seen a program that uses these APIs.
+- **File Encryption** (`DecryptFile*`, `EncryptFile*`, `FileEncryptionStatus*`) - Not supported with any game store, or even legacy games.
+- **Security Descriptors** (`GetFileSecurity*`, `SetFileSecurity*`, `GetSecurityInfo`, `SetSecurityInfo`, `GetNamedSecurityInfo*`, `SetNamedSecurityInfo*`) - ACL management. Not supported with any game store, or even legacy games.
+- **Extended Attributes** (`NtQueryEaFile`) - DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it.
+- **File System Control** (`NtFsControlFile`) - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from `NtCreateFile`, so should still be redirected nonetheless.
 
 !!! note "Roots (as of Windows 11 25H2)"
 
