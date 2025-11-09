@@ -785,6 +785,7 @@ flowchart LR
 - **File Encryption** (`DecryptFile*`, `EncryptFile*`, `FileEncryptionStatus*`, `OpenEncryptedFileRaw*`) - Not supported with any game store, or even legacy games.
 - **Security Descriptors** (`GetFileSecurity*`, `SetFileSecurity*`, `GetSecurityInfo`, `SetSecurityInfo`, `GetNamedSecurityInfo*`, `SetNamedSecurityInfo*`) - ACL management. Not supported with any game store, or even legacy games.
 - **DOS Short Names** (`SetFileShortName*`) - Legacy DOS 8.3 filename support. Not needed for games.
+- **LZ Expansion** ([lzexpand.h](https://learn.microsoft.com/en-us/windows/win32/api/lzexpand/)) - Ancient deprecated API (`LZOpenFileW` → `LZOpenFileA` → `OpenFile`, etc.). Would be redirected with existing hooks.
 - **Extended Attributes** (`NtQueryEaFile`) - DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it.
 - **File System Control** (`NtFsControlFile`) - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from `NtCreateFile`, so should still be redirected nonetheless.
 
