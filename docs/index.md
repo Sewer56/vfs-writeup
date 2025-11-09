@@ -739,12 +739,15 @@ flowchart LR
     GetFileSecurityW
     SetFileSecurityA
     SetFileSecurityW
+    SetFileShortNameA
+    SetFileShortNameW
 
     DecryptFileA --> DecryptFileW
     EncryptFileA --> EncryptFileW
     FileEncryptionStatusA --> FileEncryptionStatusW
     GetFileSecurityA --> GetFileSecurityW
     SetFileSecurityA --> SetFileSecurityW
+    SetFileShortNameA --> SetFileShortNameW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
@@ -771,6 +774,7 @@ flowchart LR
     FileEncryptionStatusW --> NtQueryInformationFile
     GetFileSecurityW --> NtQuerySecurityObject
     SetFileSecurityW --> NtSetSecurityObject
+    SetFileShortNameW --> NtSetInformationFile
     end
 ```
 
@@ -780,6 +784,7 @@ flowchart LR
 - **File Locking** (`LockFile`, `LockFileEx`, `UnlockFile`, `UnlockFileEx`) - Never seen a program that uses these APIs.
 - **File Encryption** (`DecryptFile*`, `EncryptFile*`, `FileEncryptionStatus*`, `OpenEncryptedFileRaw*`) - Not supported with any game store, or even legacy games.
 - **Security Descriptors** (`GetFileSecurity*`, `SetFileSecurity*`, `GetSecurityInfo`, `SetSecurityInfo`, `GetNamedSecurityInfo*`, `SetNamedSecurityInfo*`) - ACL management. Not supported with any game store, or even legacy games.
+- **DOS Short Names** (`SetFileShortName*`) - Legacy DOS 8.3 filename support. Not needed for games.
 - **Extended Attributes** (`NtQueryEaFile`) - DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it.
 - **File System Control** (`NtFsControlFile`) - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from `NtCreateFile`, so should still be redirected nonetheless.
 
