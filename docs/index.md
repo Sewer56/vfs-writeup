@@ -189,26 +189,29 @@ When game opens 'game/player.model':
   5. Layer 2 passes data back to game
 ```
 
-## Windows Filesystem Architecture
+## Filesystem Architecture
 
-!!! info "This section documents the Windows filesystem API architecture"
+!!! info "Understanding OS filesystem architecture"
 
-    Understanding how Win32 APIs funnel down to NT APIs is essential for implementing the VFS.
-    This is architectural context, not implementation details.
-
-Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
-
-!!! question "Why ntdll.dll specifically?"
-
-    `ntdll.dll` is the lowest-level user-mode library on Windows, sitting directly above the kernel. All higher-level file I/O APIs funnel through these ntdll functions:
+    This section documents how filesystem APIs are structured on each platform.
     
-    - Win32 APIs (`CreateFileW`, `ReadFile`) → `kernel32.dll` → `ntdll.dll`
-    - C Runtime (`fopen`, `fread`) → `ucrtbase.dll` → `kernel32.dll` → `ntdll.dll`  
-    - C++ STL (`std::ifstream`) → CRT → `kernel32.dll` → `ntdll.dll`
+    Understanding these architectures is essential for implementing the VFS.
+
+### Windows
+
+!!! tip "All user-mode file I/O APIs funnel through `ntdll.dll`"
+
+    `ntdll.dll` is the lowest-level user-mode library on Windows. It is a wrapper around kernel system calls to `ntoskrnl.exe`.
     
-    By hooking at the ntdll level, we intercept **all** file operations from any software on Windows. This works because Windows does not have stable syscalls; all user-mode software must use OS provided APIs, which pass through `ntdll.dll` to communicate with the kernel counterparts, e.g. `NtOpenFile` -> `ZwOpenFile`.
+    All higher-level file I/O APIs eventually call `ntdll.dll` functions:
     
-    This single interception point also works with Wine on Linux, since `Wine` aims to implement Win32 as closely as possible; and that includes its relationship between `kernel32.dll` and `ntdll.dll`.
+    - Win32 APIs (`CreateFileW`, `ReadFile`) → `kernel32.dll` → `ntdll.dll` → `ntoskrnl.exe` (via unstable syscalls)
+    - C Runtime (`fopen`, `fread`) → `ucrtbase.dll` → `kernel32.dll` → `ntdll.dll` → `ntoskrnl.exe` (via unstable syscalls)
+    - C++ STL (`std::ifstream`) → CRT → `kernel32.dll` → `ntdll.dll` → `ntoskrnl.exe` (via unstable syscalls)
+    
+    This makes `ntdll.dll` the single interception point for all file operations on Windows.
+    
+    **Critical:** Unlike Linux, Windows syscall numbers are **not stable** between versions. This is why `ntdll.dll` exists as a stable abstraction layer- all normal user-mode software goes through it.
 
 !!! note "These graphs were last updated in 6th-9th December 2025."
 
@@ -216,7 +219,7 @@ Both layers work by hooking low-level `ntdll.dll` APIs on Windows.
     
     Irrelevant APIs (e.g. Path Conversion `RtlDosPathNameToRelativeNtPathName`) are omitted for clarity; these converted paths will be passed to our hooks, e.g. `NtCreateFile_Hook`, in which case we do not need to concern ourselves with them.
 
-    This graph focuses on the ***entry points*** into the VFS. Some redundant calls are considered. e.g. A function calling `NtClose` after calling `NtCreateFile` to clean up will point only to `NtCreateFile`.
+    This graph focuses on the ***entry points*** into `ntdll.dll` (and thus, the VFS). Redundant calls are omitted for clarity. For example, when a function calls `NtCreateFile` and then `NtClose` to clean up the file handle, only the `NtCreateFile` call is shown in the graph.
     
     (We don't do anything in `NtClose`, other than update internal state.)
 
@@ -853,33 +856,70 @@ flowchart LR
     
     **`NtNotifyChangeDirectoryFileEx`:** Conversely, `NtNotifyChangeDirectoryFile` wraps `NtNotifyChangeDirectoryFileEx` on modern Windows versions. I have not verified which version made this change.
     
-    **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behavior.
+    **Wine Compatibility:** These `Ex` variants are not implemented in Wine. The base APIs (`NtQueryDirectoryFile` and `NtNotifyChangeDirectoryFile`) work directly without wrapper behaviour.
 
-## Linux Filesystem Architecture
+### Linux
 
-!!! info "This section documents the Linux filesystem architecture for native Linux games"
+!!! info "Native Linux games, not Wine"
 
-    Native Linux games, not Wine. Wine is covered by Windows section above.
+    This covers native Linux games only. Wine is covered by the Windows section above.
 
-Normally on operating systems, you perform a 'syscall' to request services from the kernel. On Windows, this is abstracted away by `ntdll.dll` APIs; since the order of the syscalls can change between Windows versions.
+!!! tip "Linux has a stable syscall interface"
 
-On Linux, there is a stable order of syscalls, so programs can syscall directly. Usually, doing these syscalls is abstracted away by `libc` (e.g. `glibc`); so you never write them directly.
+    Unlike Windows, Linux provides stable syscalls. This means programs can call into the kernel directly, though manually doing so is not advised.
+    
+    In practice, >99% of programs/games are built with `glibc`:
+    
+    program → `glibc` (`libc`) → kernel
+    
+    However, in some cases they may be built with `musl` (where the libc is statically linked with no exports), or using a language like Zig that syscalls directly by default.
 
-With that in mind, there are 3 options for hooking file I/O on native Linux:
+!!! tip "Linux file I/O syscalls are simpler than Windows NT APIs"
 
-1. Hook `libc` (i.e. `glibc`). Will work for ~99% of the programs out there. But some can syscall directly; e.g. Zig programs or those where libc is statically linked into the binary, i.e. `musl` instead of `glibc`.
-2. Directly patch [syscalls](https://syscalls.mebeim.net/?table=x86/64/x64/latest) for every loaded in library. 100% coverage. We add a jump to our hook function if we know the syscall number. If we don't, we check it in the hook.
-3. Use `ptrace` to intercept syscalls at the kernel boundary. This is the 'officially' supported solution, but has notable performance overhead; and not every distro will have `ptrace` allowed out the box. This is what `Snap` does on Ubuntu; and is probably part the reason people complain about startup times.
+    The actual VFS implementation on Linux will be simpler than on Windows due to the straightforward syscall interface.
 
-The ***objectively correct*** solution is Option 2 given our requirements. (Performance + Coverage). A tiny bit of assembly is required, i.e. We run a disassembler on every loaded library (`.so` file) to find syscall instructions and patch them to jump to our hook functions. 
+## Hooking Strategy
 
-This would need to be done for every arch we want to support (i.e. Aarch64, x86_64, etc.). After first arch is added (x86_64), additional arch(es) would take around a day to support; provided nothing unexpected happens (shouldn't).
+!!! info "Implementation approach for intercepting file I/O"
 
-This stuff requires some low level knowledge but is rather trivial for me (Sewer).
+    This section explains how we hook file operations on each platform, based on the
+    filesystem architectures described above.
 
-!!! tip "As for the rest, on Linux, the file I/O syscalls are way simpler than the APIs in Windows."
+### Windows
 
-    As a result, the actual VFS implementation itself would be much simpler on Linux than on Windows.
+!!! question "Why hook ntdll.dll?"
+
+    As explained in the [Windows Filesystem Architecture](#windows) section, `ntdll.dll` is the lowest-level user-mode library on Windows, sitting directly above the kernel. Since Windows syscall numbers are unstable between versions, all user-mode software must use `ntdll.dll` APIs.
+    
+    By hooking at the ntdll level, we intercept **all** file operations from any software on Windows with a single interception point.
+
+!!! tip "Wine Compatibility"
+
+    This single interception point also works with Wine on Linux, since Wine aims to implement Win32 as closely as possible- including the relationship between `kernel32.dll` and `ntdll.dll`.
+
+### Linux
+
+!!! info "Three hooking approaches for Linux"
+
+    There are three options for hooking file I/O on native Linux:
+    
+    1. **Hook `libc`** (e.g., `glibc`) - Works for ~99% of programs, but misses programs that syscall directly (e.g., Zig programs, statically-linked `musl` binaries).
+    
+    2. **Directly patch syscalls** - Disassemble every loaded library (`.so` file) to find syscall instructions and patch them to jump to our hook functions. Provides 100% coverage.
+    
+    3. **Use `ptrace`** - Intercept syscalls at the kernel boundary. This is the 'officially' supported solution, but has notable performance overhead. Not every distro allows `ptrace` out of the box. This is what Snap uses on Ubuntu, contributing to slow startup times.
+
+!!! success "Our approach: Syscall patching (Option 2)"
+
+    The optimal solution for our requirements (performance + coverage) is direct syscall patching.
+    
+    This requires running a disassembler on every loaded library to find syscall instructions and patch them with jumps to our hook functions.
+    
+    **Implementation notes:**
+    
+    - Needs to be implemented per architecture (x86_64, AArch64, etc.)
+    - After the first architecture is implemented (x86_64), additional architectures take approximately one day each
+    - Requires low-level knowledge but is straightforward
 
 ## Layer 1 Hook Endpoints
 
