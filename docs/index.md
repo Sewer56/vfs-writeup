@@ -497,9 +497,9 @@ flowchart LR
 
     `GetFileVersionInfoA`, `GetFileVersionInfoW`, `GetFileVersionInfoExA`, `GetFileVersionInfoExW`, and related APIs extract embedded version resources from PE files. These are handled by the standard file read/open APIs (`NtCreateFile`, `NtReadFile`) and don't require separate hooking.
 
-### File Copy Operations
+### File Copy & Move Operations
 
-All `CopyFile*` variants converge through `BasepCopyFileExW` for the actual copy implementation.
+All `CopyFile*` variants converge through `BasepCopyFileExW`. `MoveFile*` variants converge through `MoveFileWithProgressTransactedW` or `MoveFileWithProgressW`, with some move operations delegating to copy for cross-volume moves.
 
 ```mermaid
 flowchart LR
@@ -512,6 +512,17 @@ flowchart LR
     CopyFileFromAppW
     CopyFileTransactedA
     CopyFileTransactedW
+    MoveFileA
+    MoveFileW
+    MoveFileExA
+    MoveFileExW
+    MoveFileWithProgressA
+    MoveFileWithProgressW
+    MoveFileTransactedA
+    MoveFileTransactedW
+    MoveFileWithProgressTransactedA
+    MoveFileWithProgressTransactedW
+    MoveFileFromAppW
     BasepCopyFileExW
 
     CopyFileA --> CopyFileW
@@ -522,16 +533,31 @@ flowchart LR
     CopyFileFromAppW --> CopyFileW
     CopyFileTransactedA --> CopyFileExA
     CopyFileTransactedW --> CopyFileExW
+    MoveFileA --> MoveFileWithProgressTransactedA
+    MoveFileWithProgressTransactedA --> MoveFileWithProgressTransactedW
+    MoveFileExA --> MoveFileWithProgressTransactedA
+    MoveFileTransactedA --> MoveFileWithProgressTransactedA
+    MoveFileTransactedW --> MoveFileWithProgressTransactedW
+    MoveFileW --> MoveFileWithProgressW
+    MoveFileWithProgressA --> MoveFileWithProgressTransactedA
+    MoveFileExW --> MoveFileWithProgressTransactedW
+    MoveFileFromAppW --> MoveFileWithProgressW
+    MoveFileWithProgressW --> MoveFileWithProgressTransactedW
+    MoveFileWithProgressTransactedW --> BasepCopyFileExW
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtCreateFile
+    NtOpenFile
     NtQueryInformationFile
     NtSetInformationFile
 
     BasepCopyFileExW --> NtCreateFile
     BasepCopyFileExW --> NtQueryInformationFile
     BasepCopyFileExW --> NtSetInformationFile
+    MoveFileWithProgressTransactedW --> NtOpenFile
+    MoveFileWithProgressTransactedW --> NtQueryInformationFile
+    MoveFileWithProgressTransactedW --> NtSetInformationFile
     end
 ```
 
