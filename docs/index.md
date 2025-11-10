@@ -704,19 +704,28 @@ Handle cleanup operations that need hooking for internal state tracking.
 flowchart LR
     subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
     CloseHandle
+    DuplicateHandle
 
     end
 
     subgraph NT["NT API (ntdll.dll)"]
     NtClose
+    NtDuplicateObject
 
     CloseHandle --> NtClose
+    DuplicateHandle --> NtDuplicateObject
     end
 ```
 
 !!! info "Why hook NtClose?"
 
     We need to hook `NtClose` for lifetime management - tracking when file handles are closed to clean up internal VFS state.
+
+!!! info "Why hook NtDuplicateObject?"
+
+    We need to hook `NtDuplicateObject` to track handle duplication - when a handle is duplicated (explicitly via `DuplicateHandle` or through process inheritance), both handles refer to the same virtual file state. Layer 2 must track all handles to properly manage virtual file lifecycle.
+    
+    The use case is to reopen a handle with different permissions, but there's no reason for games to do this. Included for completeness - never observed in actual game usage.
 
 #### Notable Functions (Not Relevant for Games)
 
@@ -1171,11 +1180,6 @@ Uses Layer 1 to make virtual files visible in directory searches and to handle p
     - Intercept file information queries.
     - Report the virtual file's size and attributes from the registered metadata.
 
-- **`NtQueryFullAttributesFile`**
-    - Intercept file attribute queries.
-    - Report the virtual file's size and full attributes.
-    - Used when applications check file metadata without opening the file.
-
 - **`NtCreateSection`** & **`NtCreateSectionEx`**
     - Memory-mapped file support for virtual files.
     - When applications try to memory-map a virtual file handle, create an anonymous memory section.
@@ -1188,6 +1192,13 @@ Uses Layer 1 to make virtual files visible in directory searches and to handle p
     - Intercept file close operations.
     - Dispose of virtual file state (such as current read offset).
     - Free internal data structures for that virtual file instance.
+
+- **`NtDuplicateObject`**
+    - Intercept handle duplication operations.
+    - Track duplicated handles that refer to virtual files.
+    - Both original and duplicated handles share the same virtual file state (file position, etc.).
+    - Use case is to reopen a handle with different permissions, but there's no reason for games to do this.
+    - Included for completeness - never observed in actual game usage.
 
 **[→ Complete Hook Details](File-Emulation-Framework/Implementation-Details/Hooks.md)**
 
