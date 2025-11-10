@@ -639,33 +639,6 @@ flowchart LR
     end
 ```
 
-#### Memory Mapped Files
-
-All `CreateFileMapping*` APIs for memory-mapped file creation converge to NT section APIs.
-
-```mermaid
-flowchart LR
-    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
-    CreateFileMapping2
-    CreateFileMappingFromApp
-    CreateFileMappingNumaA
-    CreateFileMappingNumaW
-    CreateFileMappingW
-
-    CreateFileMappingNumaA --> CreateFileMappingNumaW
-    CreateFileMappingFromApp --> CreateFileMappingNumaW
-    end
-
-    subgraph NT["NT API (ntdll.dll)"]
-    NtCreateSection
-    NtCreateSectionEx
-
-    CreateFileMapping2 --> NtCreateSectionEx
-    CreateFileMappingNumaW --> NtCreateSection
-    CreateFileMappingW --> NtCreateSection
-    end
-```
-
 #### Change Notifications
 
 Directory change monitoring APIs for tracking file system modifications.
@@ -726,6 +699,98 @@ flowchart LR
     We need to hook `NtDuplicateObject` to track handle duplication - when a handle is duplicated (explicitly via `DuplicateHandle` or through process inheritance), both handles refer to the same virtual file state. Layer 2 must track all handles to properly manage virtual file lifecycle.
     
     The use case is to reopen a handle with different permissions, but there's no reason for games to do this. Included for completeness - never observed in actual game usage.
+
+#### Memory Mapped Files
+
+Memory-mapped file operations are split into three main categories: creating file mapping objects, mapping views into memory, and managing mapped views.
+
+##### File Mapping Creation
+
+All `CreateFileMapping*` APIs for memory-mapped file creation converge to NT section APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    CreateFileMapping2
+    CreateFileMappingFromApp
+    CreateFileMappingNumaA
+    CreateFileMappingNumaW
+    CreateFileMappingW
+
+    CreateFileMappingNumaA --> CreateFileMappingNumaW
+    CreateFileMappingFromApp --> CreateFileMappingNumaW
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtCreateSection
+    NtCreateSectionEx
+
+    CreateFileMapping2 --> NtCreateSectionEx
+    CreateFileMappingNumaW --> NtCreateSection
+    CreateFileMappingW --> NtCreateSection
+    end
+```
+
+##### Mapping Views
+
+All `MapViewOfFile*` APIs map sections into the process address space, and `UnmapViewOfFile*` APIs unmap them, converging to NT view mapping APIs.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    MapViewOfFile
+    MapViewOfFile3
+    MapViewOfFile3FromApp
+    MapViewOfFileEx
+    MapViewOfFileExNuma
+    MapViewOfFileFromApp
+    MapViewOfFileNuma2
+    UnmapViewOfFile
+    UnmapViewOfFile2
+    UnmapViewOfFileEx
+
+    MapViewOfFile3FromApp --> MapViewOfFile3
+    MapViewOfFileFromApp --> MapViewOfFileExNuma
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtMapViewOfSection
+    NtMapViewOfSectionEx
+    NtUnmapViewOfSectionEx
+
+    MapViewOfFile --> NtMapViewOfSection
+    MapViewOfFile3 --> NtMapViewOfSectionEx
+    MapViewOfFileEx --> NtMapViewOfSection
+    MapViewOfFileExNuma --> NtMapViewOfSection
+    MapViewOfFileNuma2 --> NtMapViewOfSection
+    UnmapViewOfFile --> NtUnmapViewOfSectionEx
+    UnmapViewOfFile2 --> NtUnmapViewOfSectionEx
+    UnmapViewOfFileEx --> NtUnmapViewOfSectionEx
+    end
+```
+
+##### View Management
+
+View flushing and write tracking operations for managing mapped memory regions.
+
+```mermaid
+flowchart LR
+    subgraph Win32["Win32 (Kernel32.dll/KernelBase.dll)"]
+    FlushViewOfFile
+    GetWriteWatch
+    ResetWriteWatch
+    end
+
+    subgraph NT["NT API (ntdll.dll)"]
+    NtFlushVirtualMemory
+    NtGetWriteWatch
+    NtResetWriteWatch
+
+    FlushViewOfFile --> NtFlushVirtualMemory
+    GetWriteWatch --> NtGetWriteWatch
+    ResetWriteWatch --> NtResetWriteWatch
+    end
+```
 
 #### Notable Functions (Not Relevant for Games)
 
@@ -805,6 +870,7 @@ flowchart LR
 - **LZ Expansion** ([lzexpand.h](https://learn.microsoft.com/en-us/windows/win32/api/lzexpand/)) - Ancient deprecated API (`LZOpenFileW` → `LZOpenFileA` → `OpenFile`, etc.). Would be redirected with existing hooks.
 - **Extended Attributes** (`NtQueryEaFile`) - DOS attributes, NTFS security descriptors, etc. Games can't have these, Windows specific and stores don't support it.
 - **File System Control** (`NtFsControlFile`) - Making sparse files, enabling NTFS compression, create junctions. This operates on file handles from `NtCreateFile`, so should still be redirected nonetheless.
+- **Opening Existing Memory Maps** (`OpenFileMappingW`, `OpenFileMappingFromApp`) - These are used to open existing memory maps, i.e. those we're already handling elsewhere.
 
 !!! note "Roots (as of Windows 11 25H2)"
 
@@ -1270,5 +1336,5 @@ Over time, new requirements emerged: **NxVFS** integration and **synthesizing ar
 ### Other Differences
 
 - Added support for Memory Maps.
-- Added missing NtOpenFile API. (& other related miscellany)
+- Added missing NtOpenFile API and other missing APIs, walked through entire kernel32 API for I/O, making graphs in this document.
 - APIs use handles to unregister/dispose.
