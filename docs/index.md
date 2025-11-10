@@ -876,9 +876,15 @@ flowchart LR
 
 !!! tip "Linux file I/O syscalls are simpler than Windows NT APIs"
 
-    The actual VFS implementation on Linux will be simpler than on Windows due to the straightforward syscall interface.
+    On Windows, you get a few very heavily overloaded functions with 10s of flags. On Linux you get a separate function for each operation, with few flags if any.
+    
+    Therefore it's easier to implement the VFS on Linux, as you don't have to work with every possible flag combination.
 
 #### File I/O System Calls
+
+!!! warning "This list needs review"
+
+    I only had a quick glance and generated this list based on syscall list with LLM help, this needs an extra review.
 
 The following syscalls handle file and directory operations on Linux (x86_64):
 
@@ -912,8 +918,6 @@ The following syscalls handle file and directory operations on Linux (x86_64):
 - `sendfile64` (40) - Transfer data between fds
 - `copy_file_range` (326) - Copy range of data between files
 - `splice` (275) - Move data between pipes and files
-- `vmsplice` (278) - Splice user pages to/from pipe
-- `tee` (276) - Duplicate pipe content
 
 **File Metadata & Status:**
 
@@ -922,8 +926,6 @@ The following syscalls handle file and directory operations on Linux (x86_64):
 - `lstat` / `newlstat` (6) - Get file status (don't follow symlinks)
 - `newfstatat` (262) - Get file status relative to directory fd
 - `statx` (332) - Extended file status
-- `statfs` (137) - Get filesystem statistics
-- `fstatfs` (138) - Get filesystem statistics by fd
 - `access` (21) - Check file accessibility
 - `faccessat` (269) - Check file accessibility relative to directory fd
 - `faccessat2` (439) - Extended faccessat with flags
@@ -950,9 +952,6 @@ The following syscalls handle file and directory operations on Linux (x86_64):
 - `rmdir` (84) - Remove directory
 - `getdents` (78) - Get directory entries
 - `getdents64` (217) - Get directory entries (64-bit)
-- `getcwd` (79) - Get current working directory
-- `chdir` (80) - Change working directory
-- `fchdir` (81) - Change working directory by fd
 
 **File & Directory Manipulation:**
 
@@ -979,6 +978,10 @@ The following syscalls handle file and directory operations on Linux (x86_64):
 - `ioctl` (16) - Device-specific I/O control
 
 **File Synchronization:**
+
+!!! info "Possibly not needed"
+
+    These operate on already-opened file handles, which would already be redirected.
 
 - `sync` (162) - Synchronize cached writes to disk
 - `syncfs` (306) - Synchronize filesystem
@@ -1057,6 +1060,16 @@ The following syscalls handle file and directory operations on Linux (x86_64):
     - After the first architecture is implemented (x86_64), additional architectures take approximately one day each
     - Requires low-level knowledge but is straightforward
 
+## Implementation Strategy
+
+!!! tip "Read-Only Implementation Focus"
+
+    The initial implementation focuses on **read-only access** and **path redirection**. This covers >99% of games and game mods, including e.g. switching folders for save file redirection.
+    
+    **Full write support** is only required by a certain few, uncommon modding tools that are built to operate on a pre-modded game folder (*cough* Skyrim *cough*). Including moving files, directory deletion, etc. will require planning, as current requirements are unclear and undefined (e.g. 'do we put in game folder? overrides folder? mod folder?' etc.). That would require discussion with additional people.
+
+The hook endpoints below are split into "Read Support" and "Write Support (Future)" sections to clearly distinguish implementation priorities.
+
 ## Layer 1 Hook Endpoints
 
 !!! info "Reminder: [Layer 1 deals with the 'where' problem](#layer-1-virtual-filesystem)"
@@ -1064,6 +1077,8 @@ The following syscalls handle file and directory operations on Linux (x86_64):
     This section documents the specific APIs hooked by Layer 1 for each platform.
 
 ### Windows
+
+#### Read Support
 
 - **`NtCreateFile`** & **`NtOpenFile`**
     - Intercept file creation/open operations. 
@@ -1076,13 +1091,39 @@ The following syscalls handle file and directory operations on Linux (x86_64):
       - When application searches a directory, inject registered virtual files into the result set.
     - Uses semaphore to avoid recursion between the two APIs on Windows 10+.
 
-- **`NtQueryAttributesFile`** && **`NtQueryFullAttributesFile`** - Return metadata for virtual/redirected files.
+- **`NtQueryAttributesFile`** & **`NtQueryFullAttributesFile`**
+    - Return metadata for virtual/redirected files.
+    - Path-based queries without opening the file.
+
+- **`NtQueryInformationByName`**
+    - Path-based file information query (Windows 10 1703+).
+    - Modern equivalent to `NtQueryAttributesFile` with extended capabilities.
+    - Returns file size, timestamps, and attributes without opening the file.
+    - Used by [`GetFileInformationByName`](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyname) (new in Windows 11 24H2; considered prerelease).
+
+- **`NtQueryObject`**
+    - Query object information including the final path name.
+    - Needed for symlink resolution and path queries on file handles.
+    - Used by `GetFinalPathNameByHandleW` to retrieve the final path for a file handle.
+    - Must return the virtual/redirected path to maintain the illusion of file location.
 
 - **`NtClose`** - Track when file handles are closed. Used for internal handle lifecycle management.
 
-If/when we implement write support, we would also hook APIs such as:
+!!! warning "Wine Compatibility"
+
+    `NtQueryInformationByName` and `NtQueryDirectoryFileEx` are not implemented in Wine (as of November 10, 2025).
+
+#### Write Support (Future)
+
+When write support is implemented, additional APIs will be hooked:
 
 - **`NtDeleteFile`** - Handle deletion operations on virtual/redirected files. Intercept deletion requests and handle appropriately.
+
+- **`NtNotifyChangeDirectoryFile`** & **`NtNotifyChangeDirectoryFileEx`**
+    - Directory change monitoring for dynamic file modifications.
+    - Only needed when dynamically adding/removing virtual files at runtime.
+    - Only needed when supporting write operations that other applications need to observe.
+    - Note: `NtNotifyChangeDirectoryFile` wraps `NtNotifyChangeDirectoryFileEx` on modern Windows.
 
 ### Linux
 
@@ -1105,19 +1146,59 @@ Uses Layer 1 to make virtual files visible in directory searches and to handle p
 
 ### Windows
 
-- **`NtCreateFile` & `NtOpenFile`** - Detect when a virtual file is being opened. Look up the registered `fileHandler` for this path and initialize state for managing read operations.
+#### Read Support
 
-- **`NtReadFile`** - Intercept file read operations. If the file is virtual, delegate to the `fileHandler` to provide the actual data at the requested offset.
+- **`NtCreateFile` & `NtOpenFile`**
+    - Detect when a virtual file is being opened.
+    - Look up the registered `fileHandler` for this path and initialize state for managing read operations.
 
-- **`NtSetInformationFile`** - Intercept handle update operations. Track file pointer position updates (seek operations). Virtual files need to maintain their own file pointer state.
+- **`NtReadFile`**
+    - Intercept file read operations.
+    - If the file is virtual, delegate to the `fileHandler` to provide the actual data at the requested offset.
 
-- **`NtQueryInformationFile`** - Intercept file information queries. Report the virtual file's size and attributes from the registered metadata.
+- **`NtReadFileScatter`**
+    - Intercept scatter-gather read operations.
+    - Reads file data into multiple non-contiguous buffers in a single operation.
+    - If the file is virtual, delegate to the `fileHandler` and fill multiple buffers.
+    - Provides API completeness alongside `NtReadFile`.
 
-- **`NtQueryFullAttributesFile`** - Intercept file attribute queries. Report the virtual file's size and full attributes. Used when applications check file metadata without opening the file.
+- **`NtSetInformationFile`**
+    - Intercept handle update operations.
+    - Track file pointer position updates (seek operations).
+    - Virtual files need to maintain their own file pointer state.
 
-- **`NtClose`** - Intercept file close operations. Dispose of virtual file state (such as current read offset). Free internal data structures for that virtual file instance.
+- **`NtQueryInformationFile`**
+    - Intercept file information queries.
+    - Report the virtual file's size and attributes from the registered metadata.
+
+- **`NtQueryFullAttributesFile`**
+    - Intercept file attribute queries.
+    - Report the virtual file's size and full attributes.
+    - Used when applications check file metadata without opening the file.
+
+- **`NtCreateSection`** & **`NtCreateSectionEx`**
+    - Memory-mapped file support for virtual files.
+    - When applications try to memory-map a virtual file handle, create an anonymous memory section.
+    - Populate the section from the `fileHandler` and map it into the process.
+    - Essential for applications using memory-mapped I/O (many games load assets this way).
+    - `NtCreateSectionEx` is the modern extended variant used by `CreateFileMapping2` and `CreateFileMappingFromApp`.
+    - Strategy used will depend on amount of data needed to map. Small mappings will be fully populated, huge mappings will use page fault handling.
+
+- **`NtClose`**
+    - Intercept file close operations.
+    - Dispose of virtual file state (such as current read offset).
+    - Free internal data structures for that virtual file instance.
 
 **[→ Complete Hook Details](File-Emulation-Framework/Implementation-Details/Hooks.md)**
+
+#### Write Support (Future)
+
+When writable virtual files are implemented, additional APIs will be hooked:
+
+- **`NtWriteFile`** & **`NtWriteFileGather`**
+    - Write operations to virtual files.
+    - Requires extending the `fileHandler` interface to support write callbacks.
+    - `NtWriteFileGather` handles scatter-gather writes (complements `NtReadFileScatter`).
 
 ### Linux
 
