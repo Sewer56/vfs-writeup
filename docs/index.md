@@ -878,6 +878,142 @@ flowchart LR
 
     The actual VFS implementation on Linux will be simpler than on Windows due to the straightforward syscall interface.
 
+#### File I/O System Calls
+
+The following syscalls handle file and directory operations on Linux (x86_64):
+
+**File Opening & Creation:**
+
+- `open` (2) - Open/create file
+- `openat` (257) - Open/create file relative to directory fd
+- `openat2` (437) - Extended open with more options
+- `creat` (85) - Create or truncate file
+- `close` (3) - Close file descriptor
+
+**File Reading & Writing:**
+
+- `read` (0) - Read from file
+- `write` (1) - Write to file
+- `pread64` (17) - Read from file at offset
+- `pwrite64` (18) - Write to file at offset
+- `readv` (19) - Read into multiple buffers
+- `writev` (20) - Write from multiple buffers
+- `preadv` (295) - Read into multiple buffers at offset
+- `pwritev` (296) - Write from multiple buffers at offset
+- `preadv2` (327) - Extended preadv with flags
+- `pwritev2` (328) - Extended pwritev with flags
+
+**File Position & Attributes:**
+
+- `lseek` (8) - Reposition file offset
+- `truncate` (76) - Truncate file to specified length
+- `ftruncate` (77) - Truncate file using fd
+- `fallocate` (285) - Preallocate space for file
+- `sendfile64` (40) - Transfer data between fds
+- `copy_file_range` (326) - Copy range of data between files
+- `splice` (275) - Move data between pipes and files
+- `vmsplice` (278) - Splice user pages to/from pipe
+- `tee` (276) - Duplicate pipe content
+
+**File Metadata & Status:**
+
+- `stat` / `newstat` (4) - Get file status
+- `fstat` / `newfstat` (5) - Get file status by fd
+- `lstat` / `newlstat` (6) - Get file status (don't follow symlinks)
+- `newfstatat` (262) - Get file status relative to directory fd
+- `statx` (332) - Extended file status
+- `statfs` (137) - Get filesystem statistics
+- `fstatfs` (138) - Get filesystem statistics by fd
+- `access` (21) - Check file accessibility
+- `faccessat` (269) - Check file accessibility relative to directory fd
+- `faccessat2` (439) - Extended faccessat with flags
+
+**File Permissions & Ownership:**
+
+!!! info "Not needed for VFS"
+
+    Assume user has access to both original and modded game files. No additional hooking required.
+
+- `chmod` (90) - Change file permissions
+- `fchmod` (91) - Change file permissions by fd
+- `fchmodat` (268) - Change file permissions relative to directory fd
+- `fchmodat2` (452) - Extended fchmodat with flags
+- `chown` (92) - Change file owner and group
+- `fchown` (93) - Change file owner and group by fd
+- `lchown` (94) - Change file owner and group (don't follow symlinks)
+- `fchownat` (260) - Change file owner and group relative to directory fd
+
+**Directory Operations:**
+
+- `mkdir` (83) - Create directory
+- `mkdirat` (258) - Create directory relative to directory fd
+- `rmdir` (84) - Remove directory
+- `getdents` (78) - Get directory entries
+- `getdents64` (217) - Get directory entries (64-bit)
+- `getcwd` (79) - Get current working directory
+- `chdir` (80) - Change working directory
+- `fchdir` (81) - Change working directory by fd
+
+**File & Directory Manipulation:**
+
+- `rename` (82) - Rename file or directory
+- `renameat` (264) - Rename relative to directory fds
+- `renameat2` (316) - Extended rename with flags
+- `link` (86) - Create hard link
+- `linkat` (265) - Create hard link relative to directory fds
+- `unlink` (87) - Remove file
+- `unlinkat` (263) - Remove file relative to directory fd
+- `symlink` (88) - Create symbolic link
+- `symlinkat` (266) - Create symbolic link relative to directory fd
+- `readlink` (89) - Read value of symbolic link
+- `readlinkat` (267) - Read value of symbolic link relative to directory fd
+- `mknod` (133) - Create special or ordinary file
+- `mknodat` (259) - Create special or ordinary file relative to directory fd
+
+**File Descriptor Operations:**
+
+- `dup` (32) - Duplicate file descriptor
+- `dup2` (33) - Duplicate file descriptor to specific fd
+- `dup3` (292) - Duplicate file descriptor with flags
+- `fcntl` (72) - File control operations
+- `ioctl` (16) - Device-specific I/O control
+
+**File Synchronization:**
+
+- `sync` (162) - Synchronize cached writes to disk
+- `syncfs` (306) - Synchronize filesystem
+- `fsync` (74) - Synchronize file data and metadata
+- `fdatasync` (75) - Synchronize file data
+- `sync_file_range` (277) - Sync file region to disk
+
+**File Locking:**
+
+- `flock` (73) - Apply or remove advisory lock
+
+**Time & Timestamps:**
+
+- `utime` (132) - Change file timestamps
+- `utimensat` (280) - Change file timestamps with nanosecond precision
+
+**Extended Attributes:**
+
+- `setxattr` (188) - Set extended attribute
+- `lsetxattr` (189) - Set extended attribute (don't follow symlinks)
+- `fsetxattr` (190) - Set extended attribute by fd
+- `setxattrat` (463) - Set extended attribute relative to directory fd
+- `getxattr` (191) - Get extended attribute
+- `lgetxattr` (192) - Get extended attribute (don't follow symlinks)
+- `fgetxattr` (193) - Get extended attribute by fd
+- `getxattrat` (464) - Get extended attribute relative to directory fd
+- `listxattr` (194) - List extended attributes
+- `llistxattr` (195) - List extended attributes (don't follow symlinks)
+- `flistxattr` (196) - List extended attributes by fd
+- `listxattrat` (465) - List extended attributes relative to directory fd
+- `removexattr` (197) - Remove extended attribute
+- `lremovexattr` (198) - Remove extended attribute (don't follow symlinks)
+- `fremovexattr` (199) - Remove extended attribute by fd
+- `removexattrat` (466) - Remove extended attribute relative to directory fd
+
 ## Hooking Strategy
 
 !!! info "Implementation approach for intercepting file I/O"
