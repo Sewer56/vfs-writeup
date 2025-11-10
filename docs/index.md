@@ -1235,12 +1235,6 @@ When writable virtual files are implemented, additional APIs will be hooked:
 
     This section will document the Linux syscalls hooked by Layer 2.
 
-### Dependencies on Layer 1
-
-- Calls `RegisterVirtualFile()` to make virtual files visible in directory listings
-- Layer 1 handles the path redirection; Layer 2 handles the data synthesis
-- Layer 1 makes virtual files appear in searches; Layer 2 provides their content
-
 ## How does this compare with my previous work?
 
 !!! info "Production-Tested Foundation"
