@@ -1084,6 +1084,8 @@ The hook endpoints below are split into "Read Support" and "Write Support (Futur
 !!! info "Reminder: [Layer 1 deals with the 'where' problem](#layer-1-virtual-filesystem)"
 
     This section documents the specific APIs hooked by Layer 1 for each platform.
+    
+    Layer 1 injects either information of redirected/joined files from other folders, or injects information supplied by Layer 2 for virtual files.
 
 ### Windows
 
@@ -1180,14 +1182,6 @@ Uses Layer 1 to make virtual files visible in directory searches and to handle p
     - Intercept file information queries.
     - Report the virtual file's size and attributes from the registered metadata.
 
-- **`NtCreateSection`** & **`NtCreateSectionEx`**
-    - Memory-mapped file support for virtual files.
-    - When applications try to memory-map a virtual file handle, create an anonymous memory section.
-    - Populate the section from the `fileHandler` and map it into the process.
-    - Essential for applications using memory-mapped I/O (many games load assets this way).
-    - `NtCreateSectionEx` is the modern extended variant used by `CreateFileMapping2` and `CreateFileMappingFromApp`.
-    - Strategy used will depend on amount of data needed to map. Small mappings will be fully populated, huge mappings will use page fault handling.
-
 - **`NtClose`**
     - Intercept file close operations.
     - Dispose of virtual file state (such as current read offset).
@@ -1200,7 +1194,31 @@ Uses Layer 1 to make virtual files visible in directory searches and to handle p
     - Use case is to reopen a handle with different permissions, but there's no reason for games to do this.
     - Included for completeness - never observed in actual game usage.
 
-**[→ Complete Hook Details](File-Emulation-Framework/Implementation-Details/Hooks.md)**
+**In the long term**, for virtual files, we will need to also handle memory-mapped file (mmap) operations:
+
+- **`NtCreateSection`** & **`NtCreateSectionEx`**
+    - Track creation of file memory maps.
+    - Populate the section from the `fileHandler` and map it into the process.
+    - `NtCreateSectionEx` is the modern extended variant used by `CreateFileMapping2` and `CreateFileMappingFromApp`.
+
+- **`NtMapViewOfSection`** & **`NtUnmapViewOfSection`**
+    - Pre-populate memory maps, or change permissions and add exception handler to emulate page faults.
+    - Applications may map the same section multiple times with different offsets, sizes, or protection flags.
+    - `NtUnmapViewOfSection` is needed for cleanup and reference counting.
+
+For small mapping regions (<128K), we can pre-populate, otherwise we page fault emulate.
+
+!!! note "Memory mapping is rare in games"
+
+    Very few games actually use memory-mapped I/O.
+    
+    I (Sewer) have not yet encountered a game/engine that uses memory mapping in practice (out of a sample of ~20 games).
+    
+    Since many games traditionally shipped on optical discs (until very recently), memory mapping was not a viable option for asset loading. 
+    
+    In addition, many consider the CPU overhead of handling page faults to not be worthwhile compared to the overhead of a second copy.
+    
+    These APIs are included for completeness.
 
 #### Write Support (Future)
 
