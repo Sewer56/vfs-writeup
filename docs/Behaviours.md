@@ -190,15 +190,21 @@ Game.exe (VFS active, sees mod files)
   └─ launches Tool.exe (no VFS, sees only original files)
 ```
 
-!!! tip "This is a very rare requirement"
+!!! note "This is a very rare requirement"
 
-    Child process support is rarely needed. It's primarily required for modding tools that operate on a pre-modded game folder (e.g., tools that launch the game as a child process to test changes).
+    Child process support is rarely needed. It's primarily required for modding tools **which then launch other tools** that operate on a pre-modded game folder (e.g., tools that launch the game as a child process to test changes).
     
     Regular games launching helper processes for replay rendering, screenshot processing, etc. typically don't need those processes to see modded files.
 
 #### Requirements for Child Process Hooking
 
-To automatically inject VFS into child processes, hook `NtCreateProcess` (or similar) - the lowest level user-mode API for process creation.
+**General strategy:**
+
+1. Hook `NtCreateUserProcess` (or similar process creation API)
+2. Modify the call to create the process suspended
+3. Inject the DLL into the suspended process
+    - Some small caveats present, I've worked around these before
+4. Resume main thread
 
 **Architecture transition support:**
 
