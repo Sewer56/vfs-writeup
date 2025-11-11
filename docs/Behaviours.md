@@ -416,7 +416,20 @@ Virtual files do not support NTFS reparse point tags (symbolic links, mount poin
 
 **Impact:** Negligible - almost all games on Xbox Store use Desktop Bridge. Pure UWP apps are Microsoft Store(s) exclusive, as no other stores support them.
 
-Pure UWP games would be a slice of the titles found [here](https://www.pcgamingwiki.com/wiki/List_of_games_exclusive_to_Microsoft_Store) - mostly mobile apps. Only notable entries are Microsoft Studios titles from late 2010s: Forza Horizon 3 (delisted years ago), Gears of War 4, Gears of War: Ultimate Edition. These titles are laced with encrypted filesystems, anti-code injection/cheat protections, etc.
+Pure UWP games would be *a slice* of the titles found [here](https://www.pcgamingwiki.com/wiki/List_of_games_exclusive_to_Microsoft_Store); Store exclusives, mostly mobile apps and retro re-releases. 
+
+I cross referenced exclusives lists, and peeked inside files; of many notable titles.
+
+Only notable 'Pure UWP' titles are some *Microsoft Studios* titles circa ~2016 (pre-Win32 Bridge/Centennial): 
+- Forza Horizon 3 (delisted years ago)
+- Gears of War 4
+- Gears of War: Ultimate Edition.
+- Crackdown 3
+[Yes. 4 notable games in total.]
+
+Other major (Blizzard) exclusive titles are Win32 and ***can be modded just fine***:
+- Warcraft 1 & 2
+- Diablo II: Resurrected
 
 !!! note "Additional considerations for pure UWP"
 

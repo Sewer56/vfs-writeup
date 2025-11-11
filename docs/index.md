@@ -1,5 +1,9 @@
 !!! info "About This Documentation"
-	Forked and improved from the [Reloaded3 Specification](https://reloaded-project.github.io/Reloaded-III/Mods/Essentials/Virtual-FileSystem/About.html). May upstream back to R3 docs, or reuse in actual project.
+
+	Forked and improved from the my original [Reloaded3 Specification](https://reloaded-project.github.io/Reloaded-III/Mods/Essentials/Virtual-FileSystem/About.html).
+    
+    Don't be surprised to find leftovers in API names, descriptions etc.<br/>
+    May upstream back to docs if not building directly from here.
 
 # User Space Virtual Filesystems
 
