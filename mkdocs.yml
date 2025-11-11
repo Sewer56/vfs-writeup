@@ -1,12 +1,12 @@
 site_name: VFS Writeup
 
-repo_name: sewer/vfs-writeup
-repo_url: https://github.com/sewer/vfs-writeup
+repo_name: sewer56/vfs-writeup
+repo_url: https://github.com/sewer56/vfs-writeup
 
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/sewer
+      link: https://github.com/sewer56
 
 extra_css:
   - vendor/Reloaded/Stylesheets/reloaded.css
