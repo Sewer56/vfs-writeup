@@ -32,7 +32,7 @@ These are intentional design decisions that define what the VFS is and isn't mea
 - ⚠️ Deleting redirected files deletes the mod's copy
 - ❌ Complex write semantics (copy-on-write, union mounts) not implemented
 
-### Write Operation Behaviors
+### Write Operation Behaviours
 
 Write behaviour differs depending on which type of redirect is used.
 
@@ -40,7 +40,7 @@ Write behaviour differs depending on which type of redirect is used.
 
 For files redirected with `add_file()` or `add_folder_as_files()`:
 
-| Operation              | Source Path     | Redirected To  | File Exists?                  | Actual Behavior                                                  | Result Location                                                                                          |
+| Operation              | Source Path     | Redirected To  | File Exists?                  | Actual Behaviour                                                 | Result Location                                                                                          |
 | ---------------------- | --------------- | -------------- | ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | **New File Creation**  | `game/file.txt` | `mod/file.txt` | N/A                           | Path redirected, creates new file                                | `mod/file.txt`                                                                                           |
 | **Open/Read File**     | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists         | Opens file at redirected path                                    | `mod/data.pak`                                                                                           |
@@ -79,7 +79,7 @@ For files redirected with `add_file()` or `add_folder_as_files()`:
 
 For paths under folders registered with `add_folder()`:
 
-| Operation              | Source Path            | Folder Redirect              | File Exists?                       | Actual Behavior                                          | Result Location                                                                                                  |
+| Operation              | Source Path            | Folder Redirect              | File Exists?                       | Actual Behaviour                                         | Result Location                                                                                                  |
 | ---------------------- | ---------------------- | ---------------------------- | ---------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | **New File Creation**  | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | N/A                                | Path redirected, creates new file                        | `mod/saves/save1.dat`                                                                                            |
 | **Open/Read File**     | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Opens file at redirected path                            | `mod/saves/save1.dat`                                                                                            |
@@ -105,37 +105,7 @@ For paths under folders registered with `add_folder()`:
     - For **writes/creates**: Write to redirected location (`mod/saves/`)
     - For **deletes**: Delete from redirected location if file exists there, otherwise original
 
-#### Delete-and-Recreate Pattern Warning
-
-!!! warning "Delete-and-recreate will lose mod files"
-
-    If a game or tool deletes a file and then recreates it with the same name, the behaviour depends on redirect type:
-    
-    **File Redirects (Tier 1) with `add_file()` / `add_folder_as_files()`:**
-    
-    By default (for `add_file()` or `add_folder_as_files()` with `RemoveRedirectOnFileDelete = false`):
-    
-    1. Game deletes `game/file.txt` → VFS deletes `mod/file.txt` (**your mod file is gone**)
-    2. Game creates `game/file.txt` → Redirect still exists, creates at `mod/file.txt` (redirected location)
-    
-    **Result**: Your mod's file is deleted and recreated as a new empty/different file at `mod/file.txt`.
-    
-    With `add_folder_as_files()` and `RemoveRedirectOnFileDelete = true`:
-    
-    1. Game deletes `game/file.txt` → VFS deletes `mod/file.txt` (**your mod file is gone**)
-    2. FileSystemWatcher detects the mod file deletion and removes the redirect
-    3. Game creates `game/file.txt` → Redirect no longer exists, creates at `game/file.txt` (original location)
-    
-    **Result**: Your mod's file is deleted, new file is in game folder.
-    
-    **Folder Fallback (Tier 2):**
-    
-    1. Game deletes `game/saves/file.txt` → VFS deletes `mod/saves/file.txt` (if it exists) or `game/saves/file.txt`
-    2. Game creates `game/saves/file.txt` → Creates at `mod/saves/file.txt` (redirected location)
-    
-    **Result**: Deleted file is gone, new file is created at redirected location (`mod/saves/`).
-
-#### Move/Rename Behavior
+#### Move/Rename Behaviour
 
 Move and rename operations are complex because they involve both source and destination paths:
 
@@ -164,7 +134,7 @@ Depending on how the OS API is used:
     - The files from both original and mod folders, or
     - Only the files covered by redirects
     
-    Behavior depends on which Windows API the application uses and which redirect types are active.
+    Behaviour depends on which Windows API the application uses and which redirect types are active.
 
 ### Per-Process Scope & Child Processes
 
@@ -483,7 +453,7 @@ Linux native support requires syscall patching implementation.
 
 **Complexity:** Per-architecture work (x86_64, AArch64, etc.), ~1 day per architecture after first one.
 
-## Edge Cases & Unexpected Behaviors
+## Edge Cases & Unexpected Behaviours
 
 ### Case Sensitivity
 
