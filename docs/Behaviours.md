@@ -88,7 +88,7 @@ For paths under folders registered with `add_folder()`:
 | **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Edits file at redirected path                            | `mod/saves/save1.dat`                                                                                            |
 | **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to editing original                           | `game/saves/save1.dat`                                                                                           |
 | **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
-| **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Deletes file at redirected path                          | `mod/saves/save1.dat` (deleted), `game/saves/save1.dat` may still exist (game will not see file due to redirect) |
+| **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Deletes file at redirected path                          | `mod/saves/save1.dat` (deleted), sticky redirect persists (file not found on subsequent access)                   |
 | **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to deleting original                          | `game/saves/save1.dat` (deleted)                                                                                 |
 | **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
 | **Delete & Recreate**  | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Either exists                      | Deletes whichever exists, creates at redirected location | Previous file deleted, new file at `mod/saves/save1.dat`                                                         |
@@ -96,6 +96,46 @@ For paths under folders registered with `add_folder()`:
 | **Copy File (source)** | `game/saves/src.dat`   | `game/saves/` → `mod/saves/` | Only `game/saves/src.dat` exists   | Falls back to copying original                           | `game/saves/dest.dat` (or `mod/saves/dest.dat` if destination is also redirected)                                |
 | **Copy File (source)** | `game/saves/src.dat`   | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
 | **Move/Rename**        | `game/saves/old.dat`   | `game/saves/` → `mod/saves/` | Either exists                      | Depends on API used                                      | Complex (see below)                                                                                              |
+
+!!! warning "Sticky Redirects Required for Folder Fallback"
+
+    **Design issue:** Plain folder redirection with dynamic lookup has inconsistent deletion behaviour.
+    
+    **Problem with naive implementation:**
+    
+    Normally, out of the box with plain folder redirection, we'd get this behaviour:
+    
+    1. Both `game/saves/save1.dat` (original) and `mod/saves/save1.dat` (modded) exist
+    2. Game opens `game/saves/save1.dat` → reads from `mod/saves/save1.dat` ✓
+    3. Something deletes `mod/saves/save1.dat`
+    4. Game opens `game/saves/save1.dat` → **now reads from `game/saves/save1.dat`** (original becomes visible!)
+    
+    This happens because plain folder redirection performs dynamic lookup on every access: "Does mod file exist? No → Fall back to original location."
+    
+    **Solution: Implement sticky redirects**
+    
+    When we redirect `game/saves/save1.dat` → `mod/saves/save1.dat` through a folder redirect, we need to **remember that specific file mapping** and keep it alive as long as the folder redirect exists.
+    
+    **Sticky redirect behaviour:**
+    
+    1. First access to `game/saves/save1.dat` finds `mod/saves/save1.dat` (exists)
+    2. **Create persistent mapping:** `game/saves/save1.dat` → `mod/saves/save1.dat` (sticky)
+    3. Something deletes `mod/saves/save1.dat`
+    4. Game opens `game/saves/save1.dat` → redirect still points to `mod/saves/save1.dat` → **File not found** (consistent with Tier 1)
+    
+    This makes folder redirects behave consistently with `add_file()` and `add_folder_as_files()`, where redirects persist regardless of file existence.
+    
+    **Why this matters:**
+    
+    Modding tools that operate on a pre-modded game folder (xEdit, Creation Kit, etc. - see [below](#modding-tools-that-modify-game-folder)) may potentially delete and recreate files. Without sticky redirects:
+    
+    - Tool deletes modded file → original becomes visible
+    - Tool expects to work with empty/deleted state → instead sees stale original data
+    - Can lead to unexpected behaviour
+    
+    **Implementation approach:** We can probably implement this by adding a file redirect (Tier 1) whenever a folder redirect successfully resolves to an existing file.
+    
+    **Needs consultation:** I (Sewer) should check with the Mod Organizer 2 folks on this - they've dealt with these tools for years and know all the edge cases.
 
 !!! info "Folder fallback behaviour"
 
@@ -120,11 +160,10 @@ Depending on how the OS API is used:
 
 **Examples:**
 
-| Redirect Type   | Source                                           | Destination                     | Result                                          |
-| --------------- | ------------------------------------------------ | ------------------------------- | ----------------------------------------------- |
-| File redirect   | `game/old.txt` → `mod/old.txt`                   | `game/new.txt` (not redirected) | Renames/moves `mod/old.txt` to `game/new.txt`   |
-| Folder fallback | `game/saves/old.sav` → `mod/saves/old.sav`       | `game/saves/new.sav`            | Renames within redirected folder structure      |
-| Folder-as-files | `game/textures/old.png` → `mod/textures/old.png` | `game/textures/new.png`         | FileSystemWatcher detects deletion and creation |
+| Redirect Type   | Source                                     | Destination                     | Result                                         |
+| --------------- | ------------------------------------------ | ------------------------------- | ---------------------------------------------- |
+| File redirect   | `game/old.txt` → `mod/old.txt`             | `game/new.txt` (not redirected) | Renames/moves `mod/old.txt` to `game/new.txt`  |
+| Folder fallback | `game/saves/old.sav` → `mod/saves/old.sav` | `game/saves/new.sav`            | Renames within redirected folder structure     |
 
 !!! warning "Folder renames are unpredictable"
 
@@ -138,21 +177,11 @@ Depending on how the OS API is used:
 
 ### Per-Process Scope & Child Processes
 
-!!! info "Initial release is per-process only"
+!!! info "Per-process isolation"
 
 The VFS operates **per-process**. Each process that wants VFS must initialize it independently.
 
-**Implications:**
-
-- ✅ Safe: VFS won't affect other programs on your system
-- ✅ Isolated: Each process has independent VFS state
-- ❌ Child processes don't inherit VFS state
-- ❌ Separate applications can't see each other's redirects
-- ❌ Not suitable for system-wide virtualization
-
-#### Child Process Support
-
-If a game launches external tools or helper processes, those processes **will not see the virtualized filesystem** in the initial release.
+If a game launches external tools or helper processes, those processes **will not see the virtualized filesystem** unless VFS is explicitly injected into them.
 
 **Example scenario:**
 
@@ -161,13 +190,25 @@ Game.exe (VFS active, sees mod files)
   └─ launches Tool.exe (no VFS, sees only original files)
 ```
 
-**Future implementation:** Automatic injection into child processes when this becomes a requirement.
-
 !!! tip "This is a very rare requirement"
 
     Child process support is rarely needed. It's primarily required for modding tools that operate on a pre-modded game folder (e.g., tools that launch the game as a child process to test changes).
     
     Regular games launching helper processes for replay rendering, screenshot processing, etc. typically don't need those processes to see modded files.
+
+#### Requirements for Child Process Hooking
+
+To automatically inject VFS into child processes, hook `NtCreateProcess` (or similar) - the lowest level user-mode API for process creation.
+
+**Architecture transition support:**
+
+| Parent Process | Child Process | Support                                              |
+| -------------- | ------------- | ---------------------------------------------------- |
+| x86            | x86           | ✅ Direct injection                                  |
+| x64            | x64           | ✅ Direct injection                                  |
+| x64            | x86           | ✅ Direct injection (WOW64)                          |
+| x86            | x64           | ⚠️ Requires external 64-bit injector EXE             |
+| ARM64          | x86/x64       | ❓ Get me an ARM64 device and I'll figure it out     |
 
 ## Memory-Mapped Files
 
@@ -355,25 +396,27 @@ Virtual files do not support NTFS reparse point tags (symbolic links, mount poin
 
 !!! warning "Pure UWP apps may not work"
 
-**Desktop Bridge a.k.a. Project Centennial:** This is Win32 apps packaged with a UWP wrapper. These apps declare `runFullTrust` capability in their manifest and have full filesystem access like regular Win32 programs. Basically all games on Xbox Store use this approach.
+**Desktop Bridge a.k.a. Project Centennial:** This is Win32 apps packaged with a UWP wrapper. These apps declare `runFullTrust` capability in their manifest and have full filesystem access like regular Win32 programs. Almost all games on Xbox Store use this approach.
 
 **Standard sandboxed UWP apps:** True UWP apps without `runFullTrust` have restricted filesystem access and may use brokered API calls through `RuntimeBroker.exe`.
 
 **What works:**
 
-- ✅ Desktop Bridge apps (basically all games on Xbox Store)
+- ✅ Desktop Bridge apps (almost all games on Xbox Store)
 
 **What might not work:**
 
 - ⚠️ Pure UWP apps without `runFullTrust` capability
+
+**Impact:** Negligible - almost all games on Xbox Store use Desktop Bridge. Pure UWP apps are Microsoft Store(s) exclusive, as no other stores support them.
+
+Pure UWP games would be a slice of the titles found [here](https://www.pcgamingwiki.com/wiki/List_of_games_exclusive_to_Microsoft_Store) - mostly mobile apps. Only notable entries are Microsoft Studios titles from late 2010s: Forza Horizon 3 (delisted years ago), Gears of War 4, Gears of War: Ultimate Edition. These titles are laced with encrypted filesystems, anti-code injection/cheat protections, etc.
 
 !!! note "Additional considerations for pure UWP"
 
     I have not yet investigated if we can simply add `runFullTrust` to regular UWP programs to make them work. Never ran into a real UWP game.
     
     Even if VFS hooks work, accessing the game folder would require dealing with the classic read/write restrictions of the `WindowsApps` folder for non-Win32 apps.
-
-**Impact:** Negligible - basically all games on Xbox Store use Desktop Bridge. Pure UWP apps are Microsoft Store(s) exclusive, as no other stores support them.
 
 ### Windows: System Calls vs. ntdll.dll
 
@@ -681,19 +724,19 @@ You can use the `add_folder()` API to create an 'overrides' folder where all wri
 
     This is no different than managing 'External Changes' in Nexus Mods App - tools make changes, and the mod manager resolves them later.
 
-### Delete-and-Recreate Workflows
+#### Delete-and-Recreate Pattern
 
-!!! danger "Tools that delete and recreate files"
+!!! info "Awareness required: Tools that delete and recreate files"
 
-Some tools use a delete-and-recreate pattern for safe file updates:
+Some modding tools could potentially delete and then recreate a file:
 
-1. Read original file
-2. Delete original file
-3. Write new file with same name
+1. Read original file (from redirected location if VFS active)
+2. Delete original file (deletes from redirected location)
+3. Write new file with same name (writes to redirected location due to folder redirect)
 
-**Problem:** As documented above, this deletes your mod's file and creates a new file in the original location.
+**What happens with VFS:** The modified file will be written to the redirected location (e.g., `overrides/` folder or a mod's folder), not the original game location. This is expected behaviour with folder redirects and sticky redirects.
 
-**Solution:** Don't use VFS with these tools.
+**Where files end up:** The modified file lands in the 'overrides' or mod folder, not the original game directory. Mod managers should track these changes and let users resolve them - same as Nexus Mods App's 'External Changes' workflow.
 
 ### Cross-Location Operations
 
