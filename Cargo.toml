@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["hello-directstorage"]
+members = ["examples/hello-directstorage"]
 # Future members (not yet implemented):
 # "mmap-hook",
 # "pe-import-patching",
