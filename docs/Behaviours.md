@@ -40,19 +40,19 @@ Write behaviour differs depending on which type of redirect is used.
 
 For files redirected with `add_file()` or `add_folder_as_files()`:
 
-| Operation | Source Path | Redirected To | File Exists? | Actual Behavior | Result Location |
-|-----------|-------------|---------------|--------------|-----------------|-----------------|
-| **New File Creation** | `game/file.txt` | `mod/file.txt` | N/A | Path redirected, creates new file | `mod/file.txt` |
-| **Open/Read File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists | Opens file at redirected path | `mod/data.pak` |
-| **Open/Read File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found) | N/A |
-| **Edit Existing File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists | Modifies file at redirected path | `mod/data.pak` |
-| **Edit Existing File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found) | N/A |
-| **Delete File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists | Deletes file at redirected path | `mod/data.pak` (deleted), original `game/data.pak` still exists (game will not see file due to redirect) |
-| **Delete File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found) | N/A |
-| **Delete & Recreate** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists | Deletes `mod/data.pak`, creates new file (redirect still exists) | **Mod file deleted**, new file at `mod/data.pak` (redirect still active) |
-| **Copy File (source)** | `game/src.dat` | `mod/src.dat` | `mod/src.dat` exists | `mod/src.dat` is copied to destination | `game/dest.dat` (or `mod/dest.dat` if destination is also redirected) |
-| **Copy File (source)** | `game/src.dat` | `mod/src.dat` | `mod/src.dat` does not exist | **Error** (file not found) | N/A |
-| **Move/Rename** | `game/old.dat` | `mod/old.dat` | Either exists | Depends on API used | Complex (see below) |
+| Operation              | Source Path     | Redirected To  | File Exists?                  | Actual Behavior                                                  | Result Location                                                                                          |
+| ---------------------- | --------------- | -------------- | ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **New File Creation**  | `game/file.txt` | `mod/file.txt` | N/A                           | Path redirected, creates new file                                | `mod/file.txt`                                                                                           |
+| **Open/Read File**     | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists         | Opens file at redirected path                                    | `mod/data.pak`                                                                                           |
+| **Open/Read File**     | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found)                                       | N/A                                                                                                      |
+| **Edit Existing File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists         | Modifies file at redirected path                                 | `mod/data.pak`                                                                                           |
+| **Edit Existing File** | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found)                                       | N/A                                                                                                      |
+| **Delete File**        | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists         | Deletes file at redirected path                                  | `mod/data.pak` (deleted), original `game/data.pak` still exists (game will not see file due to redirect) |
+| **Delete File**        | `game/data.pak` | `mod/data.pak` | `mod/data.pak` does not exist | **Error** (file not found)                                       | N/A                                                                                                      |
+| **Delete & Recreate**  | `game/data.pak` | `mod/data.pak` | `mod/data.pak` exists         | Deletes `mod/data.pak`, creates new file (redirect still exists) | **Mod file deleted**, new file at `mod/data.pak` (redirect still active)                                 |
+| **Copy File (source)** | `game/src.dat`  | `mod/src.dat`  | `mod/src.dat` exists          | `mod/src.dat` is copied to destination                           | `game/dest.dat` (or `mod/dest.dat` if destination is also redirected)                                    |
+| **Copy File (source)** | `game/src.dat`  | `mod/src.dat`  | `mod/src.dat` does not exist  | **Error** (file not found)                                       | N/A                                                                                                      |
+| **Move/Rename**        | `game/old.dat`  | `mod/old.dat`  | Either exists                 | Depends on API used                                              | Complex (see below)                                                                                      |
 
 !!! question "Open Design Question: Delete Behaviour"
 
@@ -89,23 +89,23 @@ For files redirected with `add_file()` or `add_folder_as_files()`:
 
 For paths under folders registered with `add_folder()`:
 
-| Operation | Source Path | Folder Redirect | File Exists? | Actual Behavior | Result Location |
-|-----------|-------------|-----------------|--------------|-----------------|-----------------|
-| **New File Creation** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | N/A | Path redirected, creates new file | `mod/saves/save1.dat` |
-| **Open/Read File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists | Opens file at redirected path | `mod/saves/save1.dat` |
-| **Open/Read File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to original location | `game/saves/save1.dat` |
-| **Open/Read File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists | **Error** (file not found) | N/A |
-| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists | Edits file at redirected path | `mod/saves/save1.dat` |
-| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to editing original | `game/saves/save1.dat` |
-| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists | **Error** (file not found) | N/A |
-| **Delete File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists | Deletes file at redirected path | `mod/saves/save1.dat` (deleted), `game/saves/save1.dat` may still exist (game will not see file due to redirect) |
-| **Delete File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to deleting original | `game/saves/save1.dat` (deleted) |
-| **Delete File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists | **Error** (file not found) | N/A |
-| **Delete & Recreate** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Either exists | Deletes whichever exists, creates at redirected location | Previous file deleted, new file at `mod/saves/save1.dat` |
-| **Copy File (source)** | `game/saves/src.dat` | `game/saves/` → `mod/saves/` | `mod/saves/src.dat` exists | Copies from redirected path | `game/saves/dest.dat` (or `mod/saves/dest.dat` if destination is also redirected) |
-| **Copy File (source)** | `game/saves/src.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/src.dat` exists | Falls back to copying original | `game/saves/dest.dat` (or `mod/saves/dest.dat` if destination is also redirected) |
-| **Copy File (source)** | `game/saves/src.dat` | `game/saves/` → `mod/saves/` | Neither exists | **Error** (file not found) | N/A |
-| **Move/Rename** | `game/saves/old.dat` | `game/saves/` → `mod/saves/` | Either exists | Depends on API used | Complex (see below) |
+| Operation              | Source Path            | Folder Redirect              | File Exists?                       | Actual Behavior                                          | Result Location                                                                                                  |
+| ---------------------- | ---------------------- | ---------------------------- | ---------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **New File Creation**  | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | N/A                                | Path redirected, creates new file                        | `mod/saves/save1.dat`                                                                                            |
+| **Open/Read File**     | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Opens file at redirected path                            | `mod/saves/save1.dat`                                                                                            |
+| **Open/Read File**     | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to original location                          | `game/saves/save1.dat`                                                                                           |
+| **Open/Read File**     | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
+| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Edits file at redirected path                            | `mod/saves/save1.dat`                                                                                            |
+| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to editing original                           | `game/saves/save1.dat`                                                                                           |
+| **Edit Existing File** | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
+| **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | `mod/saves/save1.dat` exists       | Deletes file at redirected path                          | `mod/saves/save1.dat` (deleted), `game/saves/save1.dat` may still exist (game will not see file due to redirect) |
+| **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Only `game/saves/save1.dat` exists | Falls back to deleting original                          | `game/saves/save1.dat` (deleted)                                                                                 |
+| **Delete File**        | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
+| **Delete & Recreate**  | `game/saves/save1.dat` | `game/saves/` → `mod/saves/` | Either exists                      | Deletes whichever exists, creates at redirected location | Previous file deleted, new file at `mod/saves/save1.dat`                                                         |
+| **Copy File (source)** | `game/saves/src.dat`   | `game/saves/` → `mod/saves/` | `mod/saves/src.dat` exists         | Copies from redirected path                              | `game/saves/dest.dat` (or `mod/saves/dest.dat` if destination is also redirected)                                |
+| **Copy File (source)** | `game/saves/src.dat`   | `game/saves/` → `mod/saves/` | Only `game/saves/src.dat` exists   | Falls back to copying original                           | `game/saves/dest.dat` (or `mod/saves/dest.dat` if destination is also redirected)                                |
+| **Copy File (source)** | `game/saves/src.dat`   | `game/saves/` → `mod/saves/` | Neither exists                     | **Error** (file not found)                               | N/A                                                                                                              |
+| **Move/Rename**        | `game/saves/old.dat`   | `game/saves/` → `mod/saves/` | Either exists                      | Depends on API used                                      | Complex (see below)                                                                                              |
 
 !!! info "Folder fallback behaviour"
 
@@ -167,11 +167,11 @@ Depending on how the OS API is used:
 
 **Examples:**
 
-| Redirect Type | Source | Destination | Result |
-|---------------|--------|-------------|--------|
-| File redirect | `game/old.txt` → `mod/old.txt` | `game/new.txt` (not redirected) | Renames/moves `mod/old.txt` to `game/new.txt` |
-| Folder fallback | `game/saves/old.sav` → `mod/saves/old.sav` | `game/saves/new.sav` | Renames within redirected folder structure |
-| Folder-as-files | `game/textures/old.png` → `mod/textures/old.png` | `game/textures/new.png` | FileSystemWatcher detects deletion and creation |
+| Redirect Type   | Source                                           | Destination                     | Result                                          |
+| --------------- | ------------------------------------------------ | ------------------------------- | ----------------------------------------------- |
+| File redirect   | `game/old.txt` → `mod/old.txt`                   | `game/new.txt` (not redirected) | Renames/moves `mod/old.txt` to `game/new.txt`   |
+| Folder fallback | `game/saves/old.sav` → `mod/saves/old.sav`       | `game/saves/new.sav`            | Renames within redirected folder structure      |
+| Folder-as-files | `game/textures/old.png` → `mod/textures/old.png` | `game/textures/new.png`         | FileSystemWatcher detects deletion and creation |
 
 !!! warning "Folder renames are unpredictable"
 
@@ -221,6 +221,28 @@ Game.exe (VFS active, sees mod files)
     Child process support is rarely needed. It's primarily required for modding tools that operate on a pre-modded game folder (e.g., tools that launch the game as a child process to test changes).
     
     Regular games launching helper processes for replay rendering, screenshot processing, etc. typically don't need those processes to see modded files.
+
+## Memory-Mapped Files
+
+!!! warning "Virtual files have limited memory mapping support"
+
+Virtual files (Layer 2) need special handling for memory-mapped I/O.
+
+**Current Idea:**
+
+- ✅ Regular file I/O: Fully supported
+- ⚠️ Memory mapping (mmap): Requires Layer 2 implementation
+- 📝 Small mappings (<128KB): Can be pre-populated
+- 📝 Large mappings: Page fault handling can (to my knowledge) be emulated with `VectoredExceptionHandler(s)`, but I need to test in practice
+- 📝 Write tracking: For writes we have `GetWriteWatch` & `ResetWriteWatch`
+
+**Platform APIs affected:**
+
+- `CreateFileMapping`, `MapViewOfFile`, `NtCreateSection`, `NtMapViewOfSection`
+
+**Impact:** Low - very few games use memory-mapped I/O. Disk I/O is traditionally preferred for game assets due to optical disc heritage.
+
+**Implementation status:** Architecture defined, not yet implemented.
 
 ## Technical Limitations
 
@@ -334,27 +356,6 @@ Transactional NTFS (TxF) is a deprecated Windows Vista feature. It's wrapped aro
 - `CreateFileTransactedA/W`, `CopyFileTransactedA/W`, etc.
 
 **Impact:** None - never seen a program use this. Microsoft deprecated it in Windows 8 (2012).
-
-### Memory-Mapped Files
-
-!!! warning "Virtual files have limited memory mapping support"
-
-Virtual files (Layer 2) need special handling for memory-mapped I/O.
-
-**Current status:**
-
-- ✅ Regular file I/O: Fully supported
-- ⚠️ Memory mapping (mmap): Requires Layer 2 implementation
-- 📝 Small mappings (<128KB): Can be pre-populated
-- 📝 Large mappings: Require page fault emulation
-
-**Platform APIs affected:**
-
-- `CreateFileMapping`, `MapViewOfFile`, `NtCreateSection`, `NtMapViewOfSection`
-
-**Impact:** Low - very few games use memory-mapped I/O. Disk I/O is traditionally preferred for game assets due to optical disc heritage.
-
-**Implementation status:** Architecture defined, not yet implemented.
 
 ### Reparse Points & Symbolic Links
 
