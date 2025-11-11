@@ -68,6 +68,7 @@ plugins:
 
 nav:
   - Home: index.md
+  - Behaviours: Behaviours.md
   - Virtual FileSystem:
       - About: Virtual-FileSystem/About.md
       - Usage:
@@ -77,7 +78,6 @@ nav:
           - API Reference: Virtual-FileSystem/Programmer-Usage/API-Reference.md
           - Usage from Reloaded3: Virtual-FileSystem/Programmer-Usage/Usage-Reloaded3.md
           - Usage as Standalone Library: Virtual-FileSystem/Programmer-Usage/Usage-Standalone.md
-      - Behaviours & Limitations: Virtual-FileSystem/Behaviours-Limitations.md
       - Performance: Virtual-FileSystem/Performance.md
       - Implementation Details:
           - Trees: Virtual-FileSystem/Implementation-Details/Trees.md

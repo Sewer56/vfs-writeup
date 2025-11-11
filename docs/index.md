@@ -954,6 +954,8 @@ flowchart LR
         In those (basically all) cases, the VFS will run just fine, as it has been for a good handful of games with existing Reloaded-II mods.
 
         It may be possible you can just add `runFullTrust` to any pure UWP app to have it work; that I'm not sure. Never ran into a real UWP game.
+        
+        Even if VFS hooks work for pure UWP apps, accessing the game folder would require dealing with the classic read/write restrictions of the `WindowsApps` folder for non-Win32 apps. Not fun.
 
 !!! note "On Windows 10 1709+, `NtQueryDirectoryFileEx` API becomes available and `NtQueryDirectoryFile` acts as a wrapper around it."
 

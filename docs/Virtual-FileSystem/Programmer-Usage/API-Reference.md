@@ -168,6 +168,27 @@ Used to map mod folders to game folders. Supports real-time edits of content in 
     void RemoveFolderAsFiles(FolderFilesHandle handle);
     ```
 
+!!! warning "FileSystemWatcher Does NOT Remove Redirects on File Deletion"
+
+    By default, when using `add_folder_as_files()`, the `FileSystemWatcher` **does not** automatically remove redirects when it detects a file deletion in the mod folder.
+    
+    **Why?** This is intentional to handle the **delete-and-recreate pattern** used by many applications:
+    
+    1. Application deletes `mod/file.txt` (monitored by FileSystemWatcher)
+    2. Application immediately recreates `mod/file.txt` with new content
+    
+    If we removed the redirect on deletion, step 2 would fail because the redirect wouldn't exist anymore and the new file would go to the wrong location.
+    
+    **Configurable behaviour:** You can enable redirect removal on file deletion by setting:
+    
+    ```rust
+    settings.set_setting(VfsSetting::RemoveRedirectOnFileDelete, true);
+    ```
+    
+    When enabled, FileSystemWatcher will remove redirects when files are deleted from the mod folder. Use this only if you're certain your applications don't use the delete-and-recreate pattern.
+    
+    **Default:** `false` (redirects persist after file deletion)
+
 ### Redirecting Folders (Fallback)
 
 Adds a Tier 2 folder fallback redirect. Files in `target_folder` will be accessible at `source_folder` only when no file redirect matches.
@@ -395,10 +416,11 @@ Gets or sets individual VFS settings.
     fn set_setting(&self, setting: VfsSetting, enable: bool)
     
     pub enum VfsSetting {
-        PrintRedirect,      // Print when a file redirect is performed
-        PrintOpen,          // Print file open operations (debug)
-        DontPrintNonFiles,  // Skip printing non-files to console
-        PrintGetAttributes, // Print attribute query operations (debug)
+        PrintRedirect,                // Print when a file redirect is performed
+        PrintOpen,                    // Print file open operations (debug)
+        DontPrintNonFiles,            // Skip printing non-files to console
+        PrintGetAttributes,           // Print attribute query operations (debug)
+        RemoveRedirectOnFileDelete,   // Remove redirect when FileSystemWatcher detects file deletion (default: false)
     }
     ```
 
@@ -409,6 +431,7 @@ Gets or sets individual VFS settings.
         R3VFS_SETTING_PRINT_OPEN = 1,
         R3VFS_SETTING_DONT_PRINT_NON_FILES = 2,
         R3VFS_SETTING_PRINT_GET_ATTRIBUTES = 3,
+        R3VFS_SETTING_REMOVE_REDIRECT_ON_FILE_DELETE = 4,
     } R3VfsSetting;
     
     bool r3vfs_settings_get(R3VfsSetting setting);
@@ -422,6 +445,7 @@ Gets or sets individual VFS settings.
         PrintOpen = 1,
         DontPrintNonFiles = 2,
         PrintGetAttributes = 3,
+        RemoveRedirectOnFileDelete = 4,
     };
     
     bool getSetting(VfsSetting setting);
@@ -435,6 +459,7 @@ Gets or sets individual VFS settings.
         PrintOpen = 1,
         DontPrintNonFiles = 2,
         PrintGetAttributes = 3,
+        RemoveRedirectOnFileDelete = 4,
     }
     
     bool GetSetting(VfsSetting setting);
@@ -476,8 +501,8 @@ Enables or disables the VFS entirely.
 ```c
 // Opaque handles (pointers to internal structures)
 typedef struct R3VfsRedirect* RedirectHandle;              // Tier 1: Individual file redirects
-typedef struct R3VfsFolderFiles* FolderFilesHandle;        // Tier 2: Folder scanned as files
-typedef struct R3VfsFolderRedirect* FolderRedirectHandle;  // Tier 3: Folder fallback redirects
+typedef struct R3VfsFolderFiles* FolderFilesHandle;        // Tier 1: Folder scanned as files
+typedef struct R3VfsFolderRedirect* FolderRedirectHandle;  // Tier 2: Folder fallback redirects
 typedef struct R3VfsVirtualFile* VirtualFileHandle;        // Virtual file registration
 
 // Invalid handle constants

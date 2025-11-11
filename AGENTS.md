@@ -1,5 +1,7 @@
 # Agent Guidelines: Documentation Folder
 
+Use British English spelling for all documentation.
+
 ## Documentation Commands
 - `mkdocs build --strict` — Check build errors
 - NEVER run blocking commands like `mkdocs serve`
