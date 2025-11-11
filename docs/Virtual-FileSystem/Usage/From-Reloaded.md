@@ -1,17 +1,23 @@
-# Basic Usage
+!!! warning "This page still needs written."
 
-!!! info "This will nee updating."
-
-    This is the original Reloaded-II documentation from the scrapped C# version which couldn't be
-    released due to teechnical runtime limitations.
+    Copied verbatim from Reloaded-II version, included as a placeholder for inspiration.
+    
+    Mod never released due to a technical .NET runtime GC limitation that risks breaking the mod
+    in a future major .NET version.
 
     This guide is just for reference and will need to be rewritten.
+
+# Basic Usage
 
 ## Download the Mod
 
 First, download the `Reloaded File Redirector` mod which provides the virtual filesystem functionality.
 
 ![DownloadMod][download-mod]
+
+!!! warning "TODO"
+
+    This screenshot is 5 years old and needs replacing.
 
 ## Add Dependency to Redirector
 
@@ -63,6 +69,7 @@ The connectors `└─` represent folders.
 To debug the mod, highlight the `Reloaded File Redirector` mod in your mod manager and click `Configure Mod`.
 
 The following settings are available:
+
 - `Log Open Files`: Prints a message to `Console` when a new file is being opened.
 - `Log Redirections`: Prints a message when a custom file is loaded from your or another mod.
 - `Log Attribute Fetches`: Prints a message when game gets file properties such as file size.

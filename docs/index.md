@@ -32,23 +32,31 @@ Layer 1 operates at the path/metadata level. It doesn't care about file contents
 
 i.e. **Layer 1** hooks path/metadata operations (`NtOpenFile`, `NtQueryDirectoryFile`, `NtQueryAttributesFile`, etc.)
 
-**[Complete Implementation Details →](Virtual-FileSystem/About.md)**
-
 #### Layer 1 Key APIs
 
-- **`AddRedirect(sourcePath, targetPath)`** - Redirect individual file paths.
+**Public APIs** (via `Redirector`):
 
-- **`RemoveRedirect(handle)`** - Remove an individual redirect.
+- **`add_redirect(&self, source_path: &str, target_path: &str) -> Result<RedirectHandle, VfsError>`**
+    - Redirect individual file paths.
 
-- **`AddRedirectFolder(sourceFolder, targetFolder)`** - Overlay entire folder structure. Files in targetFolder appear in sourceFolder.
+- **`remove_redirect(&self, handle: RedirectHandle) -> Result<(), VfsError>`**
+    - Remove an individual redirect.
 
-- **`RemoveRedirectFolder(handle)`** - Remove a folder overlay.
+- **`add_folder_redirect(&self, source_folder: &str, target_folder: &str) -> Result<FolderRedirectHandle, VfsError>`**
+    - Overlay entire folder structure.
+    - Files in targetFolder appear in sourceFolder to the game.
 
-And this private API:
+- **`remove_folder_redirect(&self, handle: FolderRedirectHandle) -> Result<(), VfsError>`**
+    - Remove a folder overlay.
 
-- **`RegisterVirtualFile(path, metadata)`** - Make a virtual file visible in directory searches. Layer 2 calls this to register virtual files so they appear when games search directories.
+**Private APIs** (via `VirtualFiles`, for Layer 2 only):
 
-- **`UnregisterVirtualFile(handle)`** - Remove a virtual file from directory search results.
+- **`register_virtual_file(&self, file_path: &str, metadata: VirtualFileMetadata) -> Result<VirtualFileHandle, VfsError>`**
+    - Make a virtual file visible in directory searches.
+    - Layer 2 calls this to register virtual files so they appear when games search directories.
+
+- **`unregister_virtual_file(&self, handle: VirtualFileHandle) -> Result<(), VfsError>`**
+    - Remove a virtual file from directory search results.
 
 ### Layer 2: Virtual File Framework
 
@@ -67,11 +75,17 @@ i.e. **Layer 2** hooks data operations (`NtReadFile`, `NtSetInformationFile`, et
 
 #### Layer 2 Key APIs
 
-These are public versions of Layer 1's private APIs:
+These are public APIs for extensions (Layer 3):
 
-- **`RegisterVirtualFile(path, metadata, fileHandler)`** - Allows extensions to create virtual files that Layer 1 will make visible in directory searches. The `metadata` is immutable metadata about file (e.g. size), the `fileHandler` parameter is an object that implements methods for handling read operations.
+- **`register_virtual_file(&self, path: &str, metadata: VirtualFileMetadata, file_handler: Box<dyn FileHandler>) -> Result<VirtualFileHandle, VfsError>`**
+    - Allows extensions to create virtual files that Layer 1 will make visible in directory searches.
+    - `metadata`: Immutable metadata about file (e.g. size)
+    - `file_handler`: Object that implements methods for handling read operations
+    - Internally calls Layer 1's `VirtualFiles::register_virtual_file()`
 
-- **`UnregisterVirtualFile(handle)`** - Removes a virtual file registered earlier.
+- **`unregister_virtual_file(&self, handle: VirtualFileHandle) -> Result<(), VfsError>`**
+    - Removes a virtual file registered earlier.
+    - Internally calls Layer 1's `VirtualFiles::unregister_virtual_file()`
 
 ### Layer 3: Extensions
 
