@@ -1,3 +1,7 @@
+!!! note "TODO: This needs split up into the separate Layer 2 and Layer 3 documentation pages."
+
+	I didn't get around to this yet. This is unedited thus far.
+
 <div align="center">
 	<h1>Reloaded3 File Emulation Framework</h1>
 	<img src="Images/Icon.png" Width=200/><br/>

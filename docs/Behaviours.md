@@ -54,16 +54,6 @@ For files redirected with `add_file()` or `add_folder_as_files()`:
 | **Copy File (source)** | `game/src.dat`  | `mod/src.dat`  | `mod/src.dat` does not exist  | **Error** (file not found)                                       | N/A                                                                                                      |
 | **Move/Rename**        | `game/old.dat`  | `mod/old.dat`  | Either exists                 | Depends on API used                                              | Complex (see below)                                                                                      |
 
-!!! question "Open Design Question: Delete Behaviour"
-
-    When a file is deleted via VFS, should we:
-    
-    - **Delete only the redirected file** (current behaviour) - leaving the original `game/data.pak` intact, but the game will still see it since the redirect is gone
-    - **Delete both original and redirected files** for consistency - so the game doesn't see a file it just deleted
-    - **Pretend the original doesn't exist** - keep original file but mark it as hidden/deleted in VFS state
-    
-    Currently, deleting a redirected file only deletes the mod's copy, and the game will see the original file again. This may not be the desired behaviour.
-
 !!! warning "FileSystemWatcher Does NOT Remove Redirects on File Deletion"
 
     By default, when using `add_folder_as_files()`, the `FileSystemWatcher` **does not** automatically remove redirects when it detects a file deletion in the mod folder.
@@ -117,27 +107,20 @@ For paths under folders registered with `add_folder()`:
 
 #### Delete-and-Recreate Pattern Warning
 
-!!! danger "Delete-and-recreate will lose mod files"
+!!! warning "Delete-and-recreate will lose mod files"
 
     If a game or tool deletes a file and then recreates it with the same name, the behaviour depends on redirect type:
     
-    **File Redirects (Tier 1) with `add_file()`:**
+    **File Redirects (Tier 1) with `add_file()` / `add_folder_as_files()`:**
+    
+    By default (for `add_file()` or `add_folder_as_files()` with `RemoveRedirectOnFileDelete = false`):
     
     1. Game deletes `game/file.txt` → VFS deletes `mod/file.txt` (**your mod file is gone**)
     2. Game creates `game/file.txt` → Redirect still exists, creates at `mod/file.txt` (redirected location)
     
     **Result**: Your mod's file is deleted and recreated as a new empty/different file at `mod/file.txt`.
     
-    **File Redirects (Tier 1) with `add_folder_as_files()`:**
-    
-    By default (with `RemoveRedirectOnFileDelete = false`):
-    
-    1. Game deletes `game/file.txt` → VFS deletes `mod/file.txt` (**your mod file is gone**)
-    2. Game creates `game/file.txt` → Redirect still exists, creates at `mod/file.txt` (redirected location)
-    
-    **Result**: Your mod's file is deleted and recreated as a new empty/different file at `mod/file.txt`.
-    
-    With `RemoveRedirectOnFileDelete = true`:
+    With `add_folder_as_files()` and `RemoveRedirectOnFileDelete = true`:
     
     1. Game deletes `game/file.txt` → VFS deletes `mod/file.txt` (**your mod file is gone**)
     2. FileSystemWatcher detects the mod file deletion and removes the redirect
@@ -199,12 +182,6 @@ The VFS operates **per-process**. Each process that wants VFS must initialize it
 
 #### Child Process Support
 
-!!! note "Child process support: Not in initial release"
-
-    **Initial release:** Per-process only. Child processes will not see virtualized files.
-    
-    **Future:** Child process injection will be implemented when needed/required.
-
 If a game launches external tools or helper processes, those processes **will not see the virtualized filesystem** in the initial release.
 
 **Example scenario:**
@@ -224,7 +201,9 @@ Game.exe (VFS active, sees mod files)
 
 ## Memory-Mapped Files
 
-!!! warning "Virtual files have limited memory mapping support"
+!!! info "Investigating this is a work in progress"
+
+    Determining the best approach for memory-mapped file support is still under investigation.
 
 Virtual files (Layer 2) need special handling for memory-mapped I/O.
 
@@ -244,9 +223,29 @@ Virtual files (Layer 2) need special handling for memory-mapped I/O.
 
 **Implementation status:** Architecture defined, not yet implemented.
 
-## Technical Limitations
+## DirectStorage
 
-These are fundamental constraints based on how the VFS operates.
+!!! info "TODO: Document DirectStorage considerations"
+
+    DirectStorage is a Windows API for high-speed asset loading that bypasses the Win32 API.
+
+TODO: Document DirectStorage compatibility. From previous observations, DirectStorage makes calls to ntdll that should work fine with VFS hooks. Worst case, DirectStorage can be forced to fall back to standard APIs.
+
+## DLL Hijacking Load Order
+
+!!! info "TODO: Document DLL hijacking considerations"
+
+    DLL hijacking is a technique where a DLL is placed in a specific location to override system DLLs.
+
+TODO: Document adding an import for the VFS DLL/Mod Loader in the PE header, and verify it works in both Windows and Wine.
+
+## Unsupported Features
+
+!!! info "Purpose-built for game modding"
+
+    These are features deliberately not implemented because games don't use them.
+    
+    The VFS is purpose-built for game modding, not as a general-purpose filesystem virtualisation solution. There are no technical barriers to supporting them, just no need at the moment. If they're needed, they'll be added.
 
 ### File Permissions & ACLs
 
@@ -320,7 +319,7 @@ Virtual files report as uncompressed, even if backing file is NTFS-compressed.
 
 - `GetCompressedFileSize` - returns actual file size, not compressed size
 
-**Impact:** Negligible - only affects disk space reporting. Game functionality unaffected.
+**Impact:** None - returning real file size is good enough.
 
 ### File Locking
 
@@ -330,13 +329,18 @@ File locking operations (`LockFile`, `LockFileEx`) work on the **redirected file
 
 **Platform APIs:** `LockFile`, `LockFileEx`, `UnlockFile`, `UnlockFileEx`
 
-**Impact:** Minimal - games rarely use file locking. When they do, locking the redirected file is usually the desired behaviour.
+**Impact:** None - games have no reason to lock other processes from access. But even if they did, the behaviour is correct.
 
 ### Extended Attributes
 
 !!! info "Extended attributes not virtualized"
 
 Linux extended attributes (xattrs) and Windows extended attributes are not virtualized.
+
+**Examples:**
+
+- Linux: `user.comment`, `security.selinux`, `security.capability`, `trusted.*`
+- Windows: DOS-era extended attributes (file comments, custom metadata)
 
 **Platform APIs not hooked:**
 
@@ -347,15 +351,15 @@ Linux extended attributes (xattrs) and Windows extended attributes are not virtu
 
 ### Transactional NTFS
 
-!!! info "Deprecated Windows feature - works transparently"
+!!! info "Deprecated Windows feature"
 
-Transactional NTFS (TxF) is a deprecated Windows Vista feature. It's wrapped around the standard APIs we already hook, so it works transparently.
+Transactional NTFS (TxF) is a deprecated Windows Vista feature.
 
 **Platform APIs (deprecated):**
 
 - `CreateFileTransactedA/W`, `CopyFileTransactedA/W`, etc.
 
-**Impact:** None - never seen a program use this. Microsoft deprecated it in Windows 8 (2012).
+**Impact:** None - never seen a program use this. Microsoft deprecated it in Windows 8 (2012). We don't explicitly support it, but it should work out of the box since it wraps around the standard APIs we already hook.
 
 ### Reparse Points & Symbolic Links
 
@@ -373,7 +377,7 @@ Virtual files do not support NTFS reparse point tags (symbolic links, mount poin
 - ❌ Virtual files can't pretend to be symlinks
 - ❌ No support for custom reparse point types
 
-**Impact:** Minimal - doesn't affect mods stored on OneDrive/cloud storage (they use different mechanisms, not reparse points).
+**Impact:** None - we can't pretend virtual files are symlinks, but games have no reason to check for this. For reparse points, cloud storage (e.g. OneDrive) uses different mechanisms and works fine.
 
 ## Platform-Specific Limitations
 
@@ -399,7 +403,7 @@ Virtual files do not support NTFS reparse point tags (symbolic links, mount poin
     
     Even if VFS hooks work, accessing the game folder would require dealing with the classic read/write restrictions of the `WindowsApps` folder for non-Win32 apps.
 
-**Impact:** Negligible - basically all games on Xbox Store use Desktop Bridge (or they can't ship to any other game store).
+**Impact:** Negligible - basically all games on Xbox Store use Desktop Bridge. Pure UWP apps are Microsoft Store(s) exclusive, as no other stores support them.
 
 ### Windows: System Calls vs. ntdll.dll
 
@@ -483,7 +487,7 @@ Linux native support requires syscall patching implementation.
 
 ### Case Sensitivity
 
-!!! info "Platform-dependent behaviour"
+!!! info "VFS uses case-insensitive comparisons"
 
 **Windows:**
 
@@ -494,14 +498,17 @@ Linux native support requires syscall patching implementation.
 **Linux:**
 
 - Case-sensitive by default (ext4, btrfs, etc.)
-- VFS uses case-sensitive comparisons
-- `Game.txt` and `game.txt` are different files
+    - Some filesystems (e.g. ext4) can be set case-insensitive, but we can't rely on this
+- VFS uses case-insensitive comparisons
+    - Only one casing of a file is recognised
+    - Users cannot be trusted to use correct case in cross-platform games (e.g. .NET)
+- `Game.txt` and `game.txt` are treated as the same file
 
-**Impact:** Cross-platform mods need to use consistent casing.
+**Impact:** Avoid creating files with different casings of the same name - only one will be recognised.
 
 ### Path Separators
 
-!!! info "Automatically normalized"
+!!! info "Path separators are normalized to the native path separator"
 
 The VFS normalizes path separators:
 
@@ -512,17 +519,23 @@ The VFS normalizes path separators:
 
 ### Long Paths (Windows)
 
-!!! warning "Windows 260-character path limit"
+!!! info "Automatic long path handling"
 
 Windows has a 260-character path limit (`MAX_PATH`) for many APIs.
 
 **VFS behaviour:**
 
-- Uses NT-style paths (`\\?\C:\...`) internally to support long paths
-- Applications using short-path APIs limited to 260 characters
-- Applications using long-path APIs can use full 32,767 characters
+- Applications using `\??\<drive>:\...` prefix are correctly handled
+- VFS automatically prepends `\??\` prefix if redirected path exceeds 260 characters
+- Applications can use full 32,767 character paths without modification
 
-**Impact:** Minimal - most games use standard paths well under 260 characters.
+!!! note "`\??\` not `\\?\`"
+
+    We use `\??\` because we're talking about the ntdll namespace prefix.
+    
+    `\\?\` is the Win32 API prefix that gets converted to `\??\` by the time it reaches ntdll.
+
+**Impact:** None - long paths are handled transparently.
 
 ### Unicode Normalization
 
@@ -532,7 +545,7 @@ The VFS does **not normalize Unicode strings**. Paths must match byte-for-byte.
 
 **Example:** `café` (NFC) vs `café` (NFD) are treated as different paths.
 
-**Impact:** Rare - most applications use one normalization form consistently.
+**Impact:** Negligible - in 2025, many games don't even properly support UTF-8 or Unicode at all, let alone use characters where normalization matters.
 
 ### Handle Lifetime
 
@@ -574,27 +587,32 @@ read(file); // still reads from mod/data/file.txt
 
 **Why:** File handles are OS-level resources pointing to the actual opened file.
 
-**Impact:** Generally desired behaviour - removing a redirect shouldn't break open files.
+**Impact:** Negligible.
+
+!!! info "Expected behaviour"
+
+    Under normal circumstances, redirections are not removed while files are currently being accessed.
+    
+    Exception: Mod authors making live changes to their mod folder while the game is running (handled by `add_folder_as_files()` with `FileSystemWatcher`) do so at their own risk.
 
 ### Concurrent Modifications
 
 !!! warning "FileSystemWatcher delays (folder-as-files only)"
 
-The `FileSystemWatcher` used by `add_folder_as_files()` may have slight delays in detecting changes to the mod folder.
+The `FileSystemWatcher` used by `add_folder_as_files()` may have slight delays in detecting real-time changes to a mod author's mod folder.
 
-**Typical delay:** <100ms on local filesystems
+**Typical delay:** <20ms on local filesystems
 
 **Limitations:**
 
 - ⚠️ Network filesystems may have longer delays
 - ⚠️ Some filesystems don't support change notifications (old NFS, some remote mounts)
-- ⚠️ High-frequency changes may be coalesced
-- ⚠️ Folder renames may not be detected properly
+- ✅ High-frequency changes may be coalesced (desirable - reduces overhead)
 
 **What this means:**
 
 - `add_file()`: No watcher, changes to mod files not tracked automatically
-- `add_folder_as_files()`: Watcher active, changes detected within ~100ms
+- `add_folder_as_files()`: Watcher active, changes detected within <20ms
 - `add_folder()`: No watcher, folder contents resolved at access time (always current)
 
 **Impact:** Minimal - delays are typically imperceptible during gameplay.
@@ -642,11 +660,17 @@ open("game/saves/other.sav"); // Falls back to Tier 2: mod/saves/other.sav
 
 **Impact:** Intentional design - allows mod priority/load order systems.
 
+!!! note "Priority customization not needed"
+
+    We could provide an API to change redirect priority, but that is not needed at the moment.
+
 ### Directory Moves During Runtime
 
-!!! danger "Moving mod folders during runtime is undefined"
+!!! danger "Moving mod folders during runtime is unsupported"
 
-If a mod folder is moved or renamed while the game is running, behaviour depends on redirect type:
+    Moving or renaming the physical mod folder on disk while the game is running is unsupported, both in the VFS and in Reloaded3 itself.
+
+If a mod folder's location on disk is moved or renamed while the game is running, behaviour depends on redirect type:
 
 **File redirects (`add_file()`):**
 
@@ -656,9 +680,7 @@ If a mod folder is moved or renamed while the game is running, behaviour depends
 
 **Folder-as-files (`add_folder_as_files()`):**
 
-- ⚠️ `FileSystemWatcher` may or may not detect the folder move
-- If detected: All file redirects are removed
-- If not detected: Redirects break (paths invalid)
+- `FileSystemWatcher` will detect the folder move and remove all file redirects
 - Open file handles remain valid but point to old location
 
 **Folder fallback (`add_folder()`):**
@@ -667,30 +689,27 @@ If a mod folder is moved or renamed while the game is running, behaviour depends
 - Lookups will fall back to original location
 - Open file handles remain valid but point to old location
 
-**Recommendation:** Don't move mod folders while the game is running.
+**Recommendation:** Don't move or rename entire mod folders on disk while the game is running. Edits within the folder are fine.
 
-## Incompatible Tools & Workflows
+## Workflows with Undefined Behaviour
 
 ### Modding Tools That Modify Game Folder
 
-!!! danger "Tools expecting to modify the game folder directly"
-
-Some modding tools are designed to operate on the actual game folder and expect to create/modify/delete files there.
+!!! warning "In rare cases, modding tools operate on a pre-modded game folder and need to create/modify/delete files"
 
 **Examples:**
 
-- **Skyrim xEdit**: Expects to create/modify plugin files in game's `Data` folder
-- **Fallout 4 Creation Kit**: Expects to write directly to game folder
+- **xEdit (Bethesda Games)**: Expects to create/modify plugin files in game's `Data` folder
+- **Bethesda Creation Kit(s)**: Expects to write directly to game folder
 - **Asset extractors** that write to game folder
 
-**Problem:**
+**Solution: Use an overrides folder**
 
-1. Tool writes to `game/newfile.esp`
-2. VFS may redirect this to `mod/newfile.esp` (if folder redirect exists)
-3. Tool expects file at `game/newfile.esp` but it's actually at `mod/newfile.esp`
-4. Confusion and errors
+You can use the `add_folder()` API to create an 'overrides' folder where all writes are redirected. These writes will later need to be resolved by the user and mod manager or similar application.
 
-**Solution:** **Disable VFS when running these tools.** Use VFS for the game itself, not for modding tools.
+!!! info "Similar to existing workflows"
+
+    This is no different than managing 'External Changes' in Nexus Mods App - tools make changes, and the mod manager resolves them later.
 
 ### Delete-and-Recreate Workflows
 
@@ -771,24 +790,3 @@ Memory usage scales primarily with **directory count**, not file count, due to s
 
 Approximately **~64 bytes per file** on average (in original C# implementation), based on Steam games folder. We can still do better. See [Performance](Virtual-FileSystem/Performance.md#file-mapping-performance-memory-usage) for detailed benchmarks.
 
-## Summary: When NOT to Use VFS
-
-!!! danger "VFS is not appropriate for:"
-
-- ✏️ **Modding tools that modify game folder** (xEdit, Creation Kit, etc.) - use VFS for game, not tools
-- 🗑️ **Delete-and-recreate workflows** - will lose files from mod folders
-- 👶 **Child process workflows** - external tools won't see virtualized files
-- 🔐 **Security isolation** - VFS is not a security boundary
-- 💼 **System-wide virtualization** - works per-process only
-- 🌐 **Network filesystem reliance** - FileSystemWatcher may be unreliable
-- 📝 **Tools requiring ACLs/permissions** - not supported
-- 🔒 **Encrypted file support** - NTFS EFS not supported
-- 💾 **NTFS advanced features** - ADS, reparse points, compression not supported
-
-!!! success "VFS is perfect for:"
-
-- 🎮 **Game modding** - replace/add game assets transparently
-- 📦 **Archive replacement** - redirect game archives without extraction
-- 💾 **Save file redirection** - move saves to different locations
-- ⚙️ **Config file management** - per-mod config overrides
-- 🔄 **Hot-reload development** - edit files and see changes immediately
