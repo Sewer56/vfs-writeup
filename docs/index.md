@@ -36,18 +36,34 @@ i.e. **Layer 1** hooks path/metadata operations (`NtOpenFile`, `NtQueryDirectory
 
 **Public APIs** (via `Redirector`):
 
-- **`add_redirect(&self, source_path: &str, target_path: &str) -> Result<RedirectHandle, VfsError>`**
-    - Redirect individual file paths.
+Individual File Redirects:
 
-- **`remove_redirect(&self, handle: RedirectHandle) -> Result<(), VfsError>`**
-    - Remove an individual redirect.
+- **`add_file(&self, source_path: &str, target_path: &str) -> Result<RedirectHandle, VfsError>`**
+    - Redirect individual file paths manually.
 
-- **`add_folder_redirect(&self, source_folder: &str, target_folder: &str) -> Result<FolderRedirectHandle, VfsError>`**
-    - Overlay entire folder structure.
-    - Files in targetFolder appear in sourceFolder to the game.
+- **`remove_file(&self, handle: RedirectHandle) -> Result<(), VfsError>`**
+    - Remove an individual file redirect.
 
-- **`remove_folder_redirect(&self, handle: FolderRedirectHandle) -> Result<(), VfsError>`**
-    - Remove a folder overlay.
+Automatic File Redirects (Folder-as-Files):
+
+- **`add_folder_as_files(&self, source_folder: &str, target_folder: &str) -> Result<FolderFilesHandle, VfsError>`**
+    - Track current state of folder and create redirects automatically with `FileSystemWatcher`.
+    - Used to map mod folders to game folders.
+    - Supports real-time edits of content in mod folder.
+    - **Recommended for most mod scenarios.**
+
+- **`remove_folder_as_files(&self, handle: FolderFilesHandle) -> Result<(), VfsError>`**
+    - Remove folder-as-files and associated file redirects.
+
+Folder Fallback Redirects:
+
+- **`add_folder(&self, source_folder: &str, target_folder: &str) -> Result<FolderRedirectHandle, VfsError>`**
+    - Create folder fallback redirect (Tier 2 lookup).
+    - **Use when you expect writes to non-mod (game) folders** (e.g., save files, config files).
+    - If you expect writes to mod folders, use `add_folder_as_files()` instead.
+
+- **`remove_folder(&self, handle: FolderRedirectHandle) -> Result<(), VfsError>`**
+    - Remove a folder fallback redirect.
 
 **Private APIs** (via `VirtualFiles`, for Layer 2 only):
 

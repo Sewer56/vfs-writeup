@@ -38,59 +38,42 @@ This API handles file and folder path redirection.
     - **C++**: `Redirector`
     - **C#**: `IRedirector`
 
-### Understanding File vs Folder Redirects
+### Understanding Redirect Types
 
-The VFS provides two types of redirection with different purposes:
+The VFS uses **two lookup tiers**:
 
-**File Redirects** (Primary - Fast Path):
+**Tier 1: File Redirects** (Fast - Checked First):
 
 - Map individual files: `File A → File B`
 - Checked first, highest priority
-- Stored in optimized data structure for fast lookups
-- **This is the default and recommended approach**
 
-**Folder Redirects** (Fallback - Dynamic Content):
+**Tier 2: Folder Redirects** (Fallback - Checked Second):
 
 - Map folder paths recursively: `Foo/ → Kitty/`
 - Only checked when no file redirect exists
-- Used for save file redirection and dynamic content where files are not known in advance
-- Can be nested: `Foo/Bar → Kitty/Kat` and `Foo/Bar/Baz → Nya/Nyan`
+- **Use when you expect writes to non-mod (game) folders** (e.g., save files, config files)
 - Recursive: `Foo → Kitty` means `Foo/Bar/Baz/File.txt → Kitty/Bar/Baz/File.txt`
+- Can point subfolders to different paths, e.g. `Foo/Bar → Kitty/Kat` and `Foo/Bar/Baz → Nya/Nyan`
+- **Slower than file redirects**
 
-!!! warning "Folder redirects are fallback only"
+!!! tip "Lookup priority"
 
-    Folder redirects are a secondary mechanism used when no file redirect matches.
-    
-    **Use file redirects for:** Loading assets from elsewhere (textures, models, audio, etc.). File redirects are more performant.
-    
-    **Use folder redirects for:** Scenarios where you expect writes or when files may be created in a folder and we cannot know their names ahead of time (e.g., save files, user-generated content).
-
-!!! tip "Priority order"
-
-    1. **File redirects** are checked first
-    2. **Folder redirects** are checked as fallback
-    3. Within each category, later additions take precedence over earlier ones
+    1. **File redirects** (Tier 1) - checked first
+    2. **Folder redirects** (Tier 2) - checked only if no file redirect found
+    3. Within the same tier, later additions take precedence over earlier ones
 
 ### Redirecting Individual Files
 
 Redirects an individual file from `source_path` (original game path) to `target_path` (mod file path).
 
-!!! info "File redirects from folders"
-
-    When adding file redirects from `source_folder` to `target_folder`, the VFS scans `target_folder` and creates individual file redirects for each file found.
-    
-    A `FileSystemWatcher` is automatically created to monitor `target_folder` for changes, updating redirects in real-time when files are added, removed, or modified.
-    
-    This provides the performance benefits of file-level redirects while maintaining dynamic behavior.
-
 === "Rust"
     ```rust
-    fn add_redirect(&self, source_path: &str, target_path: &str) -> Result<RedirectHandle, VfsError>
+    fn add_file(&self, source_path: &str, target_path: &str) -> Result<RedirectHandle, VfsError>
     ```
 
 === "C Export"
     ```c
-    R3VfsResult r3vfs_redirector_add(
+    R3VfsResult r3vfs_redirector_add_file(
         const char* source_path,
         const char* target_path,
         RedirectHandle* handle_out
@@ -99,47 +82,105 @@ Redirects an individual file from `source_path` (original game path) to `target_
 
 === "C++"
     ```cpp
-    RedirectHandle addRedirect(std::string_view source_path, std::string_view target_path);
+    RedirectHandle addFile(std::string_view source_path, std::string_view target_path);
     ```
 
 === "C#"
     ```csharp
-    RedirectHandle AddRedirect(string sourcePath, string targetPath);
+    RedirectHandle AddFile(string sourcePath, string targetPath);
     ```
 
-**Removing redirects:**
+**Removing file redirects:**
 
 === "Rust"
     ```rust
-    fn remove_redirect(&self, handle: RedirectHandle) -> Result<(), VfsError>
+    fn remove_file(&self, handle: RedirectHandle) -> Result<(), VfsError>
     ```
 
 === "C Export"
     ```c
-    R3VfsResult r3vfs_redirector_remove(RedirectHandle handle);
+    R3VfsResult r3vfs_redirector_remove_file(RedirectHandle handle);
     ```
 
 === "C++"
     ```cpp
-    void removeRedirect(RedirectHandle handle);
+    void removeFile(RedirectHandle handle);
     ```
 
 === "C#"
     ```csharp
-    void RemoveRedirect(RedirectHandle handle);
+    void RemoveFile(RedirectHandle handle);
+    ```
+
+### Redirecting Folders as Files
+
+Tracks the current state of `target_folder` and automatically creates individual file redirects for each file found. A `FileSystemWatcher` monitors `target_folder` for changes, automatically adding/removing file redirects when files are created, deleted, or modified.
+
+Used to map mod folders to game folders. Supports real-time edits of content in mod folder.
+
+!!! tip "Recommended for most mod scenarios"
+
+    This provides the performance benefits of file redirects (Tier 1 lookup) with the convenience of folder-based management. The `FileSystemWatcher` ensures redirects stay synchronized with the filesystem.
+
+=== "Rust"
+    ```rust
+    fn add_folder_as_files(&self, source_folder: &str, target_folder: &str) -> Result<FolderFilesHandle, VfsError>
+    ```
+
+=== "C Export"
+    ```c
+    R3VfsResult r3vfs_redirector_add_folder_as_files(
+        const char* source_folder,
+        const char* target_folder,
+        FolderFilesHandle* handle_out
+    );
+    ```
+
+=== "C++"
+    ```cpp
+    FolderFilesHandle addFolderAsFiles(std::string_view source_folder, std::string_view target_folder);
+    ```
+
+=== "C#"
+    ```csharp
+    FolderFilesHandle AddFolderAsFiles(string sourceFolder, string targetFolder);
+    ```
+
+**Removing folder-as-files redirects:**
+
+=== "Rust"
+    ```rust
+    fn remove_folder_as_files(&self, handle: FolderFilesHandle) -> Result<(), VfsError>
+    ```
+
+=== "C Export"
+    ```c
+    R3VfsResult r3vfs_redirector_remove_folder_as_files(FolderFilesHandle handle);
+    ```
+
+=== "C++"
+    ```cpp
+    void removeFolderAsFiles(FolderFilesHandle handle);
+    ```
+
+=== "C#"
+    ```csharp
+    void RemoveFolderAsFiles(FolderFilesHandle handle);
     ```
 
 ### Redirecting Folders (Fallback)
 
-Adds a fallback folder redirect. Files in `target_folder` will be accessible at `source_folder`.
+Adds a Tier 2 folder fallback redirect. Files in `target_folder` will be accessible at `source_folder` only when no file redirect matches.
 
-!!! warning "Use sparingly"
+!!! warning "Use when you expect writes to non-mod (game) folders"
 
-    Folder redirects are less efficient than file redirects. Use them only for scenarios where files may be created in a folder and we cannot know their names ahead of time (e.g., save files, user-generated content).
+    Folder redirects are less efficient than file redirects (Tier 1). Use them when you expect the **game** to write files (e.g., save files, config files, user-generated content).
+    
+    **If you expect writes to mod folders**, use `add_folder_as_files()` instead - the `FileSystemWatcher` will automatically track changes and provide better performance.
 
 === "Rust"
     ```rust
-    fn add_folder_redirect(&self, source_folder: &str, target_folder: &str) -> Result<FolderRedirectHandle, VfsError>
+    fn add_folder(&self, source_folder: &str, target_folder: &str) -> Result<FolderRedirectHandle, VfsError>
     ```
 
 === "C Export"
@@ -153,19 +194,19 @@ Adds a fallback folder redirect. Files in `target_folder` will be accessible at 
 
 === "C++"
     ```cpp
-    FolderRedirectHandle addFolderRedirect(std::string_view source_folder, std::string_view target_folder);
+    FolderRedirectHandle addFolder(std::string_view source_folder, std::string_view target_folder);
     ```
 
 === "C#"
     ```csharp
-    FolderRedirectHandle AddFolderRedirect(string sourceFolder, string targetFolder);
+    FolderRedirectHandle AddFolder(string sourceFolder, string targetFolder);
     ```
 
 **Removing folder redirects:**
 
 === "Rust"
     ```rust
-    fn remove_folder_redirect(&self, handle: FolderRedirectHandle) -> Result<(), VfsError>
+    fn remove_folder(&self, handle: FolderRedirectHandle) -> Result<(), VfsError>
     ```
 
 === "C Export"
@@ -175,12 +216,12 @@ Adds a fallback folder redirect. Files in `target_folder` will be accessible at 
 
 === "C++"
     ```cpp
-    void removeFolderRedirect(FolderRedirectHandle handle);
+    void removeFolder(FolderRedirectHandle handle);
     ```
 
 === "C#"
     ```csharp
-    void RemoveFolderRedirect(FolderRedirectHandle handle);
+    void RemoveFolder(FolderRedirectHandle handle);
     ```
 
 ### Optimization
@@ -434,12 +475,14 @@ Enables or disables the VFS entirely.
 
 ```c
 // Opaque handles (pointers to internal structures)
-typedef struct R3VfsRedirect* RedirectHandle;
-typedef struct R3VfsFolderRedirect* FolderRedirectHandle;
-typedef struct R3VfsVirtualFile* VirtualFileHandle;
+typedef struct R3VfsRedirect* RedirectHandle;              // Tier 1: Individual file redirects
+typedef struct R3VfsFolderFiles* FolderFilesHandle;        // Tier 2: Folder scanned as files
+typedef struct R3VfsFolderRedirect* FolderRedirectHandle;  // Tier 3: Folder fallback redirects
+typedef struct R3VfsVirtualFile* VirtualFileHandle;        // Virtual file registration
 
 // Invalid handle constants
 #define R3VFS_INVALID_REDIRECT_HANDLE NULL
+#define R3VFS_INVALID_FOLDER_FILES_HANDLE NULL
 #define R3VFS_INVALID_FOLDER_REDIRECT_HANDLE NULL
 #define R3VFS_INVALID_VIRTUAL_FILE_HANDLE NULL
 ```
@@ -462,18 +505,18 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
 
 === "Rust"
     ```rust
-    let handle = redirector.add_redirect(
+    let handle = redirector.add_file(
         r"dvdroot\bgm\SNG_STG26.adx", 
         r"mods\mybgm.adx"
     )?;
     // ...
-    redirector.remove_redirect(handle)?;
+    redirector.remove_file(handle)?;
     ```
 
 === "C"
     ```c
     RedirectHandle handle;
-    R3VfsResult result = r3vfs_redirector_add(
+    R3VfsResult result = r3vfs_redirector_add_file(
         "dvdroot/bgm/SNG_STG26.adx",
         "mods/mybgm.adx",
         &handle
@@ -482,42 +525,98 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
         // Handle error
     }
     // ...
-    r3vfs_redirector_remove(handle);
+    r3vfs_redirector_remove_file(handle);
     ```
 
 === "C++"
     ```cpp
-    auto handle = _redirector->AddRedirect(
+    auto handle = _redirector->AddFile(
         R"(dvdroot\bgm\SNG_STG26.adx)", 
         R"(mods\mybgm.adx)"
     );
     // ...
-    _redirector->RemoveRedirect(handle);
+    _redirector->RemoveFile(handle);
     ```
 
 === "C#"
     ```csharp
-    var handle = _redirector.AddRedirect(@"dvdroot\bgm\SNG_STG26.adx", @"mods\mybgm.adx");
+    var handle = _redirector.AddFile(@"dvdroot\bgm\SNG_STG26.adx", @"mods\mybgm.adx");
     // ...
-    _redirector.RemoveRedirect(handle);
+    _redirector.RemoveFile(handle);
     ```
 
-### Folder Redirect (for Save Files)
+### Folder-as-Files (Automatic File Redirects)
 
 === "Rust"
     ```rust
-    // Redirect save files to a different location
-    let handle = redirector.add_folder_redirect(
-        r"game\saves", 
-        r"mods\mymod\saves"
+    // Scan mod folder and create file redirects with FileSystemWatcher
+    let handle = redirector.add_folder_as_files(
+        r"dvdroot\textures", 
+        r"mods\mytextures"
     )?;
-    // Now: game\saves\profile1.sav -> mods\mymod\saves\profile1.sav
-    // Even for files created at runtime
+    // VFS scans mods\mytextures and creates file redirects for each file
+    // FileSystemWatcher monitors for changes
+    // ...
+    redirector.remove_folder_as_files(handle)?;
     ```
 
 === "C"
     ```c
-    // Redirect save files to a different location
+    // Scan mod folder and create file redirects with FileSystemWatcher
+    FolderFilesHandle handle;
+    R3VfsResult result = r3vfs_redirector_add_folder_as_files(
+        "dvdroot/textures",
+        "mods/mytextures",
+        &handle
+    );
+    if (result != R3VFS_OK) {
+        // Handle error
+    }
+    // VFS scans mods/mytextures and creates file redirects for each file
+    // FileSystemWatcher monitors for changes
+    // ...
+    r3vfs_redirector_remove_folder_as_files(handle);
+    ```
+
+=== "C++"
+    ```cpp
+    // Scan mod folder and create file redirects with FileSystemWatcher
+    auto handle = _redirector->AddFolderAsFiles(
+        R"(dvdroot\textures)", 
+        R"(mods\mytextures)"
+    );
+    // VFS scans mods\mytextures and creates file redirects for each file
+    // FileSystemWatcher monitors for changes
+    // ...
+    _redirector->RemoveFolderAsFiles(handle);
+    ```
+
+=== "C#"
+    ```csharp
+    // Scan mod folder and create file redirects with FileSystemWatcher
+    var handle = _redirector.AddFolderAsFiles(@"dvdroot\textures", @"mods\mytextures");
+    // VFS scans mods\mytextures and creates file redirects for each file
+    // FileSystemWatcher monitors for changes
+    // ...
+    _redirector.RemoveFolderAsFiles(handle);
+    ```
+
+### Folder Redirect (Fallback for Save Files)
+
+=== "Rust"
+    ```rust
+    // Redirect save files to a different location (fallback lookup)
+    let handle = redirector.add_folder(
+        r"game\saves", 
+        r"mods\mymod\saves"
+    )?;
+    // Now: game\saves\profile1.sav -> mods\mymod\saves\profile1.sav
+    // Works even for files created at runtime (unknown filenames)
+    ```
+
+=== "C"
+    ```c
+    // Redirect save files to a different location (fallback lookup)
     FolderRedirectHandle handle;
     R3VfsResult result = r3vfs_redirector_add_folder(
         "game/saves",
@@ -528,26 +627,26 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
         // Handle error
     }
     // Now: game/saves/profile1.sav -> mods/mymod/saves/profile1.sav
-    // Even for files created at runtime
+    // Works even for files created at runtime (unknown filenames)
     ```
 
 === "C++"
     ```cpp
-    // Redirect save files to a different location
-    auto handle = _redirector->AddFolderRedirect(
+    // Redirect save files to a different location (fallback lookup)
+    auto handle = _redirector->AddFolder(
         R"(game\saves)", 
         R"(mods\mymod\saves)"
     );
     // Now: game\saves\profile1.sav -> mods\mymod\saves\profile1.sav
-    // Even for files created at runtime
+    // Works even for files created at runtime (unknown filenames)
     ```
 
 === "C#"
     ```csharp
-    // Redirect save files to a different location
-    var handle = _redirector.AddFolderRedirect(@"game\saves", @"mods\mymod\saves");
+    // Redirect save files to a different location (fallback lookup)
+    var handle = _redirector.AddFolder(@"game\saves", @"mods\mymod\saves");
     // Now: game\saves\profile1.sav -> mods\mymod\saves\profile1.sav
-    // Even for files created at runtime
+    // Works even for files created at runtime (unknown filenames)
     ```
 
 ### Register Virtual File
@@ -684,9 +783,9 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
 
 === "Rust"
     ```rust
-    // Add many redirects
+    // Add many file redirects
     for i in 0..1000 {
-        redirector.add_redirect(
+        redirector.add_file(
             &format!("game/file{}.dat", i),
             &format!("mods/file{}.dat", i)
         )?;
@@ -698,14 +797,14 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
 
 === "C"
     ```c
-    // Add many redirects
+    // Add many file redirects
     for (int i = 0; i < 1000; i++) {
         char source[256], target[256];
         snprintf(source, sizeof(source), "game/file%d.dat", i);
         snprintf(target, sizeof(target), "mods/file%d.dat", i);
         
         RedirectHandle handle;
-        r3vfs_redirector_add(source, target, &handle);
+        r3vfs_redirector_add_file(source, target, &handle);
     }
 
     // Trigger optimization
@@ -714,11 +813,11 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
 
 === "C++"
     ```cpp
-    // Add many redirects
+    // Add many file redirects
     for (int i = 0; i < 1000; i++) {
         auto source = std::format("game/file{}.dat", i);
         auto target = std::format("mods/file{}.dat", i);
-        _redirector->AddRedirect(source, target);
+        _redirector->AddFile(source, target);
     }
 
     // Trigger optimization
@@ -727,9 +826,9 @@ typedef struct R3VfsVirtualFile* VirtualFileHandle;
 
 === "C#"
     ```csharp
-    // Add many redirects
+    // Add many file redirects
     for (int i = 0; i < 1000; i++) {
-        _redirector.AddRedirect($"game/file{i}.dat", $"mods/file{i}.dat");
+        _redirector.AddFile($"game/file{i}.dat", $"mods/file{i}.dat");
     }
 
     // Trigger optimization
@@ -752,7 +851,9 @@ The VFS is written in Rust with C exports. C headers are automatically generated
 
 ## Nice-to-Have APIs (Future)
 
-The following APIs may be implemented in the future as needed:
+!!! info "Future APIs"
+
+    The following APIs may be implemented in the future as needed.
 
 ### Query & Introspection
 
@@ -771,9 +872,10 @@ R3VfsResult r3vfs_redirector_get_target(
 bool r3vfs_vfile_is_virtual(const char* path);
 
 // Get counts (for debugging/stats)
-uint32_t r3vfs_redirector_get_count(void);
-uint32_t r3vfs_redirector_get_folder_count(void);
-uint32_t r3vfs_vfile_get_count(void);
+uint32_t r3vfs_redirector_get_file_count(void);              // Count of individual file redirects
+uint32_t r3vfs_redirector_get_folder_files_count(void);      // Count of folder-as-files redirects
+uint32_t r3vfs_redirector_get_folder_count(void);            // Count of folder fallback redirects
+uint32_t r3vfs_vfile_get_count(void);                        // Count of virtual files
 
 // Enumerate redirects (callback-based)
 typedef void (*R3VfsEnumerateCallback)(
@@ -782,7 +884,8 @@ typedef void (*R3VfsEnumerateCallback)(
     void* user_data
 );
 
-void r3vfs_redirector_enumerate(R3VfsEnumerateCallback callback, void* user_data);
+void r3vfs_redirector_enumerate_files(R3VfsEnumerateCallback callback, void* user_data);
+void r3vfs_redirector_enumerate_folder_files(R3VfsEnumerateCallback callback, void* user_data);
 void r3vfs_redirector_enumerate_folders(R3VfsEnumerateCallback callback, void* user_data);
 ```
 
@@ -793,7 +896,7 @@ void r3vfs_redirector_enumerate_folders(R3VfsEnumerateCallback callback, void* u
     These APIs would only be available when compiled with the `vfs_statistics` feature flag.
 
 ```c
-#[cfg(feature = "vfs_statistics")]
+#ifdef R3VFS_FEATURE_STATISTICS
 typedef struct {
     uint64_t total_redirects_hit;         // Number of file redirects used
     uint64_t total_folder_redirects_hit;  // Number of folder redirects used
@@ -802,9 +905,7 @@ typedef struct {
     uint64_t total_cache_misses;
 } R3VfsStatistics;
 
-#[cfg(feature = "vfs_statistics")]
 R3VfsResult r3vfs_statistics_get(R3VfsStatistics* stats_out);
-
-#[cfg(feature = "vfs_statistics")]
 void r3vfs_statistics_reset(void);
+#endif // R3VFS_FEATURE_STATISTICS
 ```
