@@ -69,6 +69,10 @@ plugins:
 nav:
   - Home: index.md
   - Behaviours: Behaviours.md
+  - Technology Integrations:
+      - DLL Hijacking: Technology-Integrations/DLL-Hijacking.md
+      - DirectStorage: Technology-Integrations/DirectStorage.md
+      - Memory Map Hooking: Technology-Integrations/Memory-Map-Hooking.md
   - Virtual FileSystem:
       - About: Virtual-FileSystem/About.md
       - Usage:
