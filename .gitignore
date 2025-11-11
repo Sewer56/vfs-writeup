@@ -15,4 +15,12 @@ __pycache__/
 site/
 
 # LLM Prompt Files
+PROMPT.md
 PROMPT-*.md
+
+# Rust artifacts
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+*.exe

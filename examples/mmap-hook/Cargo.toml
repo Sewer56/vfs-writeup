@@ -1,0 +1,8 @@
+# This demo is not yet implemented
+
+[package]
+name = "mmap-hook"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish = false

@@ -1,0 +1,15 @@
+[package]
+name = "hello-directstorage"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish = false
+build = "build.rs"
+
+[[bin]]
+name = "hello-directstorage"
+path = "src/main.rs"
+
+[dependencies]
+direct-storage.workspace = true
+windows.workspace = true
