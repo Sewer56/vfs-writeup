@@ -350,6 +350,34 @@ Registers a new virtual file at `file_path` with the provided metadata. This all
     void UnregisterVirtualFile(VirtualFileHandle handle);
     ```
 
+### Checking if Handle is Virtual
+
+Checks if a file handle (obtained from OS APIs like `NtCreateFile`, `CreateFileW`, etc.) is a Layer 2 virtual file.
+
+!!! info "Used by Layer 2 Hooks"
+    
+    This API is used by Layer 2's internal hooks (e.g., `NtReadFile`, IoRing hooks) to determine if a handle needs special processing.
+
+=== "Rust"
+    ```rust
+    fn is_virtual_file_handle(&self, handle: HANDLE) -> bool
+    ```
+
+=== "C Export"
+    ```c
+    bool r3vfs_vfile_is_virtual_handle(HANDLE handle);
+    ```
+
+=== "C++"
+    ```cpp
+    bool isVirtualFileHandle(HANDLE handle);
+    ```
+
+=== "C#"
+    ```csharp
+    bool IsVirtualFileHandle(IntPtr handle);
+    ```
+
 ### VirtualFileMetadata Structure
 
 ```rust
