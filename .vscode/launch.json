@@ -12,8 +12,7 @@
                 "args": [
                     "run",
                     "--bin=hello-directstorage",
-                    "--",
-                    "Cargo.toml"
+                    "--package=hello-directstorage"
                 ]
             },
             "args": []
@@ -25,7 +24,58 @@
             "cargo": {
                 "args": [
                     "test",
-                    "--bin=hello-directstorage"
+                    "--bin=hello-directstorage",
+                    "--package=hello-directstorage"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'mmap-pre-populate'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=mmap-pre-populate",
+                    "--package=mmap-pre-populate"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'mmap-pre-populate'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=mmap-pre-populate",
+                    "--package=mmap-pre-populate"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'mmap-page-fault'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=mmap-page-fault",
+                    "--package=mmap-page-fault"
+                ]
+            },
+            "args": []
+        },
+        {
+            "name": "Debug unit tests in executable 'mmap-page-fault'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=mmap-page-fault",
+                    "--package=mmap-page-fault"
                 ]
             }
         }

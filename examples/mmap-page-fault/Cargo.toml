@@ -1,0 +1,14 @@
+[package]
+name = "mmap-page-fault"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "mmap-page-fault"
+path = "src/main.rs"
+
+[dependencies]
+windows.workspace = true
+retour.workspace = true

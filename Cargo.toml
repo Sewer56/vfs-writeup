@@ -1,9 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["examples/hello-directstorage"]
-# Future members (not yet implemented):
-# "mmap-hook",
-# "pe-import-patching",
+members = ["examples/hello-directstorage", "examples/mmap-pre-populate", "examples/mmap-page-fault"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,6 +9,7 @@ authors = ["VFS Documentation Contributors"]
 
 [workspace.dependencies]
 direct-storage = { git = "https://github.com/Tsukisoft/direct-storage-rs" }
+retour = "0.3"
 windows = { version = "0.62", features = [
     "Win32_Storage_FileSystem",
     "Win32_Graphics_Direct3D",
@@ -19,5 +17,10 @@ windows = { version = "0.62", features = [
     "Win32_Graphics_Dxgi_Common",
     "Win32_Foundation",
     "Win32_System_Threading",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
     "Win32_Security",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Kernel",
+    "Win32_System_SystemInformation",
 ] }

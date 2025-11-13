@@ -20,7 +20,7 @@ Use **British English** spelling throughout all documentation, code comments, an
 
 - `mkdocs build --strict` — Build documentation and check for errors
 - Before running mkdocs, create/use a virtual environment like `start_docs.py` does
-- **NEVER run blocking commands** like `mkdocs serve`
+- **NEVER run blocking commands** like `mkdocs serve` or `start_docs.py`
 - The `examples/` folder contains a Cargo workspace with Rust demonstration code
 
 ## Core Documentation Invariants
