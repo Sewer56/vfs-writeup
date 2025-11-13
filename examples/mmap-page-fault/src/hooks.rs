@@ -60,13 +60,15 @@ static EXCEPTION_HANDLER_HANDLE: Mutex<Option<HandlerHandle>> = Mutex::new(None)
 
 // Tracking state for section handles, memory mappings, and exception ranges
 struct MappingState {
-    // Maps section handle -> section handle (for consistency with pre-populate)
+    // Maps section handle -> backing_storage_base_address
+    // Each section has ONE backing storage allocation that all views share
     sections: HashMap<usize, usize>,
-    // Maps base address -> (size, section handle)
-    mappings: HashMap<usize, (usize, usize)>,
-    // Maps memory base -> (size, section handle, offset) for exception handler lookup
-    // Offset field added to support mapping at non-zero offsets
-    exception_ranges: HashMap<usize, (usize, usize, i64)>,
+    // Maps view_base_address -> (view_size, section_handle, offset_into_section)
+    // Tracks individual views that point into backing storage
+    view_metadata: HashMap<usize, (usize, usize, i64)>,
+    // Maps backing_storage_base -> (storage_size, section_handle)
+    // Exception ranges registered per backing storage, not per view
+    exception_ranges: HashMap<usize, (usize, usize)>,
 }
 
 // Use lazy initialisation for the global state
@@ -77,7 +79,7 @@ fn get_mapping_state() -> std::sync::MutexGuard<'static, Option<MappingState>> {
     if guard.is_none() {
         *guard = Some(MappingState {
             sections: HashMap::new(),
-            mappings: HashMap::new(),
+            view_metadata: HashMap::new(),
             exception_ranges: HashMap::new(),
         });
     }
@@ -108,28 +110,28 @@ unsafe extern "system" fn exception_handler(exception_info: *mut EXCEPTION_POINT
     let mut state_guard = get_mapping_state();
     let state = state_guard.as_mut().unwrap();
 
-    // Check if fault address is in any tracked exception range
-    let mut found_range: Option<(usize, usize, usize, i64)> = None; // (base, size, section, offset)
-    for (&base_addr, &(size, section, offset)) in &state.exception_ranges {
-        if fault_addr >= base_addr && fault_addr < base_addr + size {
-            found_range = Some((base_addr, size, section, offset));
+    // Check if fault address is in any tracked backing storage range
+    let mut found_range: Option<(usize, usize, usize)> = None; // (backing_storage_base, size, section)
+    for (&backing_storage_base, &(size, section)) in &state.exception_ranges {
+        if fault_addr >= backing_storage_base && fault_addr < backing_storage_base + size {
+            found_range = Some((backing_storage_base, size, section));
             break;
         }
     }
 
-    let (base_addr, _size, _section, offset) = match found_range {
+    let (backing_storage_base, _size, _section) = match found_range {
         Some(range) => range,
         None => return EXCEPTION_CONTINUE_SEARCH, // Not our virtual file
     };
 
-    // Calculate which page was accessed, accounting for offset
-    // The page number for synthesis represents the file-relative page being accessed.
-    // The page start address is relative to the view's base address (reserved memory).
-    // Example: If mapping starts at offset PAGE_SIZE (page 1 of file),
-    // then accessing byte 0 of the view (base_addr + 0) should retrieve file page 1.
-    let view_page_num = (fault_addr - base_addr) / PAGE_SIZE;
-    let file_page_num = view_page_num + ((offset as usize) / PAGE_SIZE);
-    let page_start_addr = base_addr + (view_page_num * PAGE_SIZE);
+    // Calculate which page was accessed relative to backing storage
+    // Since all views share the same backing storage, the page number is calculated
+    // relative to the backing storage base. This ensures commits are visible to all views.
+    let page_num = (fault_addr - backing_storage_base) / PAGE_SIZE;
+    let page_start_addr = backing_storage_base + (page_num * PAGE_SIZE);
+
+    // Drop the lock before calling VirtualAlloc to avoid holding it during system call
+    drop(state_guard);
 
     // Commit the page with VirtualAlloc
     let result = VirtualAlloc(
@@ -148,11 +150,11 @@ unsafe extern "system" fn exception_handler(exception_info: *mut EXCEPTION_POINT
     // In a real VFS hook, we would read the corresponding page from the virtual file to fill in.
     // We would probably also want to try preloading adjacent pages for performance.
     let buffer = slice::from_raw_parts_mut(page_start_addr as *mut u8, PAGE_SIZE);
-    content::synthesise_page(buffer, file_page_num);
+    content::synthesise_page(buffer, page_num);
 
     println!(
         "      → Page fault handler: Committed and populated file page {} at address 0x{:X}",
-        file_page_num, page_start_addr
+        page_num, page_start_addr
     );
 
     // Return EXCEPTION_CONTINUE_EXECUTION to retry the faulting instruction
@@ -175,23 +177,32 @@ unsafe extern "system" fn nt_create_section_detour(
     if file_handle.0 as usize == VIRTUAL_FILE_MARKER {
         println!("      → NtCreateSection hook: Virtual file detected");
 
-        // CRITICAL DIFFERENCE from pre-populate: NO memory allocation at this stage
-        println!("      → Creating anonymous section (no memory allocation yet)");
-
-        // Create a synthetic section handle (use timestamp-based value to ensure uniqueness)
-        let section = HANDLE(
-            (std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as usize) as *mut c_void,
+        // CRITICAL: Allocate backing storage ONCE for the ENTIRE file (all views will reference this)
+        // Use MEM_RESERVE to reserve address space without committing physical memory
+        // Pages will be committed on-demand by the exception handler
+        println!(
+            "      → Allocating backing storage ({} bytes) with VirtualAlloc(MEM_RESERVE)",
+            FILE_SIZE
         );
+        let backing_storage = VirtualAlloc(None, FILE_SIZE, MEM_RESERVE, PAGE_NOACCESS);
+
+        if backing_storage.is_null() {
+            return NTSTATUS(-1073741823); // STATUS_UNSUCCESSFUL
+        }
+
+        println!("      → Backing storage allocated at {:?}", backing_storage);
+
+        // Create a synthetic section handle (use backing storage address for simplicity)
+        let section = HANDLE(backing_storage);
         *section_handle = section;
 
-        // Track section in mapping state
+        // Track section -> backing storage mapping
         let mut state_guard = get_mapping_state();
         let state = state_guard.as_mut().unwrap();
         let section_addr = section.0 as usize;
-        state.sections.insert(section_addr, section_addr);
+        state
+            .sections
+            .insert(section_addr, backing_storage as usize);
 
         println!("      → Section handle created and tracked");
 
@@ -232,46 +243,47 @@ unsafe extern "system" fn nt_close_detour(handle: HANDLE) -> NTSTATUS {
     let state = state_guard.as_mut().unwrap();
 
     // Check if this handle is a tracked section handle
-    if state.sections.remove(&handle_value).is_some() {
+    if let Some(backing_storage) = state.sections.remove(&handle_value) {
         println!("      → NtClose hook: Virtual section handle detected");
 
-        // Find all mappings that use this section handle (handles both normal and abnormal lifecycle)
-        let mut mappings_to_remove = Vec::new();
-        for (&base_addr, &(_size, section_handle)) in &state.mappings {
+        // Find all views that reference this section (handles both normal and abnormal lifecycle)
+        let mut views_to_remove = Vec::new();
+        for (&view_addr, &(_size, section_handle, _offset)) in &state.view_metadata {
             if section_handle == handle_value {
-                mappings_to_remove.push(base_addr);
+                views_to_remove.push(view_addr);
             }
         }
 
-        // Warn if mappings still exist (indicates abnormal lifecycle)
-        if !mappings_to_remove.is_empty() {
+        // Warn if views still exist (indicates abnormal lifecycle - should unmap before closing)
+        if !views_to_remove.is_empty() {
             println!(
-                "      → Found {} mapping(s) to clean up",
-                mappings_to_remove.len()
+                "      → Warning: {} view(s) still exist; cleaning up to prevent stale references",
+                views_to_remove.len()
             );
         }
 
-        // Clean up all mappings associated with this section
-        for base_addr in &mappings_to_remove {
-            // Remove tracking to prevent stale references
-            state.exception_ranges.remove(base_addr);
-            state.mappings.remove(base_addr);
-
+        // Remove all view metadata for this section
+        for view_addr in views_to_remove {
+            state.view_metadata.remove(&view_addr);
             println!(
-                "      → Deregistered exception range for base 0x{:X}",
-                base_addr
+                "      → Removed view tracking for address 0x{:X}",
+                view_addr
             );
         }
+
+        // Remove exception range for the backing storage
+        state.exception_ranges.remove(&backing_storage);
+        println!(
+            "      → Deregistered exception range for backing storage 0x{:X}",
+            backing_storage
+        );
 
         drop(state_guard);
 
-        // Free the reserved memory for all mappings
-        for base_addr in mappings_to_remove {
-            VirtualFree(base_addr as *mut c_void, 0, MEM_RELEASE).expect("VirtualFree failed");
-            println!("      → Freed memory at 0x{:X}", base_addr);
-        }
-
-        println!("      → Section cleaned up, memory freed");
+        // CRITICAL: Free the ONE backing storage allocation (works for all views that referenced it)
+        VirtualFree(backing_storage as *mut c_void, 0, MEM_RELEASE).expect("VirtualFree failed");
+        println!("      → Freed backing storage at 0x{:X}", backing_storage);
+        println!("      → Section cleaned up (single backing storage freed)");
 
         return NTSTATUS(0); // STATUS_SUCCESS
     }
@@ -298,81 +310,84 @@ unsafe extern "system" fn nt_map_view_of_section_detour(
 ) -> NTSTATUS {
     let section_addr = section_handle.0 as usize;
 
-    let state_guard = get_mapping_state();
-    let state = state_guard.as_ref().unwrap();
+    let mut state_guard = get_mapping_state();
+    let state = state_guard.as_mut().unwrap();
 
-    // Check if this is our virtual section
-    if state.sections.contains_key(&section_addr) {
-        println!("      → NtMapViewOfSection hook: Virtual section detected");
-
-        // PROOF OF CONCEPT: Basic offset support demonstrated.
-        // Read the section_offset parameter. In production, additional validation would be needed
-        // (alignment checks, bounds checking, offset + view_size <= file_size, etc.)
-        let offset = if !section_offset.is_null() {
-            unsafe { *section_offset }
-        } else {
-            0
-        };
-
-        drop(state_guard);
-
-        // CRITICAL DIFFERENCE from pre-populate: Allocate MEM_RESERVE only (not MEM_COMMIT)
-        // Adjust the reserved size based on offset
-        let adjusted_size = FILE_SIZE.saturating_sub(offset as usize);
-        let memory_base = VirtualAlloc(None, adjusted_size, MEM_RESERVE, PAGE_NOACCESS);
-
-        if memory_base.is_null() {
-            return NTSTATUS(-1073741823); // STATUS_UNSUCCESSFUL
+    // Check if this is our virtual section and retrieve backing storage
+    let backing_storage = match state.sections.get(&section_addr) {
+        Some(&bs) => bs,
+        None => {
+            drop(state_guard);
+            // Not our virtual section - call original function (unhooked implementation)
+            let original_fn = ORIGINAL_NT_MAP_VIEW.unwrap();
+            return original_fn(
+                section_handle,
+                process_handle,
+                base_address,
+                zero_bits,
+                commit_size,
+                section_offset,
+                view_size,
+                inherit_disposition,
+                allocation_type,
+                win32_protect,
+            );
         }
+    };
 
-        let memory_addr = memory_base as usize;
+    println!("      → NtMapViewOfSection hook: Virtual section detected");
 
-        println!(
-            "      → Allocated MEM_RESERVE ({} bytes) at 0x{:X} (offset: {} bytes)",
-            adjusted_size, memory_addr, offset
-        );
+    // PROOF OF CONCEPT: Basic offset support demonstrated.
+    // Read the section_offset parameter. In production, additional validation would be needed
+    // (alignment checks, bounds checking, offset + view_size <= file_size, etc.)
+    let offset = if !section_offset.is_null() {
+        unsafe { *section_offset }
+    } else {
+        0
+    };
 
-        // Set output parameters
-        *base_address = memory_base;
-        if !view_size.is_null() {
-            *view_size = adjusted_size;
-        }
+    // CRITICAL: Return pointer INTO existing backing storage (no new allocation)
+    // Calculate view address: backing_storage + offset
+    let view_address = (backing_storage as i64 + offset) as *mut c_void;
+    let adjusted_size = FILE_SIZE.saturating_sub(offset as usize);
 
-        // Register address range with exception handler (including offset for page calculation)
-        let mut state_guard = get_mapping_state();
-        let state = state_guard.as_mut().unwrap();
-        state
-            .exception_ranges
-            .insert(memory_addr, (adjusted_size, section_addr, offset));
-        state
-            .mappings
-            .insert(memory_addr, (adjusted_size, section_addr));
+    println!(
+        "      → Returning pointer into backing storage: 0x{:X} (backing_storage: 0x{:X} + offset: {} bytes)",
+        view_address as usize, backing_storage, offset
+    );
 
-        println!(
-            "      → Address range registered with exception handler: [0x{:X}, 0x{:X})",
-            memory_addr,
-            memory_addr + adjusted_size
-        );
-        println!("      → Mapping tracked (lazy commitment enabled)");
-
-        return NTSTATUS(0); // STATUS_SUCCESS
+    // Set output parameters
+    *base_address = view_address;
+    if !view_size.is_null() {
+        *view_size = adjusted_size;
     }
-    drop(state_guard);
 
-    // Not our virtual section - call original function (unhooked implementation)
-    let original_fn = ORIGINAL_NT_MAP_VIEW.unwrap();
-    original_fn(
-        section_handle,
-        process_handle,
-        base_address,
-        zero_bits,
-        commit_size,
-        section_offset,
-        view_size,
-        inherit_disposition,
-        allocation_type,
-        win32_protect,
-    )
+    // Track view metadata for cleanup
+    let view_addr = view_address as usize;
+    state
+        .view_metadata
+        .insert(view_addr, (adjusted_size, section_addr, offset));
+
+    // Register exception range for backing storage (only if not already registered)
+    // Multiple views can share the same backing storage
+    if let std::collections::hash_map::Entry::Vacant(e) =
+        state.exception_ranges.entry(backing_storage)
+    {
+        e.insert((FILE_SIZE, section_addr));
+        println!(
+            "      → Registered backing storage exception range: [0x{:X}, 0x{:X})",
+            backing_storage,
+            backing_storage + FILE_SIZE
+        );
+    } else {
+        println!(
+            "      → Backing storage exception range already registered (shared by multiple views)"
+        );
+    }
+
+    println!("      → View tracked (lazy commitment enabled)");
+
+    NTSTATUS(0) // STATUS_SUCCESS
 }
 
 // NtUnmapViewOfSection hook implementation
@@ -390,17 +405,27 @@ unsafe extern "system" fn nt_unmap_view_of_section_detour(
     let state = state_guard.as_mut().unwrap();
 
     // Check if this is our virtual mapping
-    if state.mappings.contains_key(&addr) {
+    if let Some((_view_size, section_handle, _offset)) = state.view_metadata.remove(&addr) {
         println!("      → NtUnmapViewOfSection hook: Virtual mapping detected");
 
-        // Deregister exception range (to prevent handler from processing faults after unmapping)
-        state.exception_ranges.remove(&addr);
+        // Check if any other views still reference the same section
+        let other_views_exist = state
+            .view_metadata
+            .values()
+            .any(|(_, sh, _)| *sh == section_handle);
 
-        // Remove mapping tracking (the view is unmapped, but memory persists until NtClose)
-        state.mappings.remove(&addr);
+        // Only deregister exception range if no other views exist for this section
+        if !other_views_exist {
+            // Find backing storage for this section to deregister exception range
+            if let Some(&backing_storage) = state.sections.get(&section_handle) {
+                state.exception_ranges.remove(&backing_storage);
+                println!("      → Deregistered exception range (last view for this section)");
+            }
+        } else {
+            println!("      → Exception range kept (other views still reference this section)");
+        }
 
-        println!("      → Address range deregistered from exception handler");
-        println!("      → View unmapped (memory will be freed when section handle is closed)");
+        println!("      → View unmapped (backing storage persists until section handle is closed)");
 
         drop(state_guard);
 
@@ -426,17 +451,27 @@ unsafe extern "system" fn nt_unmap_view_of_section_ex_detour(
     let state = state_guard.as_mut().unwrap();
 
     // Check if this is our virtual mapping
-    if state.mappings.contains_key(&addr) {
+    if let Some((_view_size, section_handle, _offset)) = state.view_metadata.remove(&addr) {
         println!("      → NtUnmapViewOfSectionEx hook: Virtual mapping detected");
 
-        // Deregister exception range (to prevent handler from processing faults after unmapping)
-        state.exception_ranges.remove(&addr);
+        // Check if any other views still reference the same section
+        let other_views_exist = state
+            .view_metadata
+            .values()
+            .any(|(_, sh, _)| *sh == section_handle);
 
-        // Remove mapping tracking (the view is unmapped, but memory persists until NtClose)
-        state.mappings.remove(&addr);
+        // Only deregister exception range if no other views exist for this section
+        if !other_views_exist {
+            // Find backing storage for this section to deregister exception range
+            if let Some(&backing_storage) = state.sections.get(&section_handle) {
+                state.exception_ranges.remove(&backing_storage);
+                println!("      → Deregistered exception range (last view for this section)");
+            }
+        } else {
+            println!("      → Exception range kept (other views still reference this section)");
+        }
 
-        println!("      → Address range deregistered from exception handler");
-        println!("      → View unmapped (memory will be freed when section handle is closed)");
+        println!("      → View unmapped (backing storage persists until section handle is closed)");
 
         drop(state_guard);
 

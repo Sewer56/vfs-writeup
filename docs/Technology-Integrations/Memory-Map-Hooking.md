@@ -162,7 +162,7 @@ When `CreateFileMapping` (Win32 API) is called, it invokes `NtCreateSection` (nt
 **File size determines allocation behaviour:**
 
 - **Small files (< 128 KB)**: Allocate committed memory with `VirtualAlloc(MEM_COMMIT | MEM_RESERVE)`, populate with synthesised content, and create an anonymous section backed by the memory
-- **Large files (≥ 128 KB)**: Create an anonymous section handle (metadata token) without allocating memory yet-allocation deferred until `NtMapViewOfSection`
+- **Large files (≥ 128 KB)**: Allocate backing storage with `VirtualAlloc(MEM_RESERVE, PAGE_NOACCESS)` for the ENTIRE file-all views will reference this single allocation
 
 !!! example "Detection and Allocation"
     ```rust
@@ -181,9 +181,10 @@ When `CreateFileMapping` (Win32 API) is called, it invokes `NtCreateSection` (nt
                 let section = create_anonymous_section(memory, file_size);
                 track_section(section, memory);
             } else {
-                // Large file: create handle only
-                let section = create_synthetic_section_handle();
-                track_section(section, 0);
+                // Large file: allocate backing storage for the ENTIRE file (all views will reference this)
+                let backing_storage = VirtualAlloc(None, file_size, MEM_RESERVE, PAGE_NOACCESS);
+                let section = create_anonymous_section_handle();
+                track_section(section, backing_storage); // Section handle → backing storage mapping
             }
             
             *section_handle = section;
@@ -213,13 +214,14 @@ Behaviour differs based on file size:
 
 **For large files (page fault emulation):**
 
-1. **Reserve Virtual Memory Space**: Use `VirtualAlloc(MEM_RESERVE, PAGE_NOACCESS)` to reserve address space without committing physical memory
-2. **Register Exception Range**: Add the address range to the vectored exception handler's tracking structure
-3. **Track Mapping**: Store mapping metadata including base address, size, and section handle
+1. **Retrieve Backing Storage**: Get backing storage base address from section handle
+2. **Calculate View Address**: Compute view address as `backing_storage + section_offset` (pointer arithmetic into existing allocation)
+3. **Register Exception Range**: Add the backing storage address range to the vectored exception handler's tracking structure (only if not already registered)
+4. **Track View Metadata**: Store view metadata including view address, size, section handle, and offset
 
-!!! warning "Critical for Page Fault Emulation"
+!!! info "Shared Backing Storage Architecture"
     
-    Windows determines the mapping base address during `NtMapViewOfSection`-unavailable during `NtCreateSection`. For large files, memory allocation **must** occur here, not in `NtCreateSection`.
+    The section's backing storage is allocated in `NtCreateSection`. This hook returns pointers into that existing allocation, allowing multiple views to share the same underlying pages. Pages committed in the backing storage are visible to ALL views.
 
 ### NtUnmapViewOfSection and NtUnmapViewOfSectionEx Hooks
 
@@ -227,13 +229,13 @@ When `UnmapViewOfFile` (or its variants) is called, it invokes either `NtUnmapVi
 
 **For all virtual files:**
 
-1. **Identify Virtual Mappings**: Check if the base address is tracked
-2. **Remove View Tracking**: Remove the mapping from the registry
-3. **Do Not Free Memory**: Memory must persist until the section handle is closed
+1. **Identify Virtual Mappings**: Check if the view address is tracked in view metadata
+2. **Remove View Tracking**: Remove the view from the view metadata registry
+3. **Do Not Free Memory**: Backing storage must persist until the section handle is closed
 
 **Additionally, for large files only:**
 
-- **Deregister Exception Range**: Remove the address range from the vectored exception handler's tracking structure
+- **Deregister Exception Range**: Remove the backing storage address range from the vectored exception handler's tracking structure (only if this is the last view for the section)
 
 !!! warning "Section Lifetime Independence"
     
@@ -244,8 +246,9 @@ When `UnmapViewOfFile` (or its variants) is called, it invokes either `NtUnmapVi
 The `NtClose` hook is the **critical cleanup point** for resource deallocation. When a section handle is closed:
 
 1. **Identify Section Handles**: Check if the handle corresponds to a tracked virtual section
-2. **Free Allocated Memory**: Call `VirtualFree(MEM_RELEASE)` to deallocate all memory (works for both pre-populated and sparse allocations)
-3. **Remove Section Tracking**: Remove the section from the tracking registry
+2. **Free Backing Storage**: Call `VirtualFree(MEM_RELEASE)` to deallocate the ONE backing storage allocation created in `NtCreateSection` (all views of the section shared this backing storage during their lifetime)
+3. **Remove All View Metadata**: Clean up any remaining view tracking entries for this section
+4. **Remove Section Tracking**: Remove the section from the tracking registry
 
 !!! warning "Memory Leak Prevention"
     
