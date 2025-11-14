@@ -35,17 +35,15 @@ This wiki describes the implementation details of a **two-layer architecture** f
 - **[Layer 2: Virtual File Framework](File-Emulation-Framework/About.md)** - Handles virtual file data synthesis and read operations for extensions
 - **[Layer 3: Archive Emulation Framework](File-Emulation-Framework/About.md)** - Extensions for injecting files into game archives without writing code
 
-!!! info "Layer 2 and Layer 3 documentation is incomplete"
+!!! info "Complete Layer 2 & Layer 3 documentation isn't here yet"
 
-    Provided as reference only, not final.
-    
-    This has been copied as-is from the Reloaded3 planning doc; and needs some refinements:
+    Files inside the `File-Emulation-Framework` folder are drafts provided as reference only, not final.
+
+    This has been copied as-is from the Reloaded3 planning doc; and need additional refinements:
     
     - Extract Layer 2 stuff into `Virtual File Framework`
     - Extract Layer 3 stuff into `Archive Emulation Framework`
-    - And make a page for Nx2VFS
-
-
+    - And make a page for Nx2VFS, with more detailed info
 
 ## Implementation Overview
 
