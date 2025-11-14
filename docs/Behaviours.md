@@ -218,43 +218,72 @@ Game.exe (VFS active, sees mod files)
 
 ## Memory-Mapped Files
 
-!!! info "Investigating this is a work in progress"
+!!! info "Layer 1 works out of the box, Layer 2 needs special handling"
 
-    Determining the best approach for memory-mapped file support is still under investigation.
+**Layer 1 (File Redirection):**
 
-Virtual files (Layer 2) need special handling for memory-mapped I/O.
+- ✅ Works out of the box - redirected files memory-map normally
+- No special handling required
 
-**Current Idea:**
+**Layer 2 (Virtual Files):**
 
-- ✅ Regular file I/O: Fully supported
-- ⚠️ Memory mapping (mmap): Requires Layer 2 implementation
-- 📝 Small mappings (<128KB): Can be pre-populated
-- 📝 Large mappings: Page fault handling can (to my knowledge) be emulated with `VectoredExceptionHandler(s)`, but I need to test in practice
-- 📝 Write tracking: For writes we have `GetWriteWatch` & `ResetWriteWatch`
-
-**Platform APIs affected:**
-
-- `CreateFileMapping`, `MapViewOfFile`, `NtCreateSection`, `NtMapViewOfSection`
+- ⚠️ Requires special handling for reads & writes
+- Small files (<128KB): Pre-populated committed memory
+- Large files (≥128KB): Page fault emulation with `VectoredExceptionHandler`
+- Writes: Requires dirty page tracking (`NtGetWriteWatch`, `NtResetWriteWatch`)
 
 **Impact:** Low - very few games use memory-mapped I/O. Disk I/O is traditionally preferred for game assets due to optical disc heritage.
 
-**Implementation status:** Architecture defined, not yet implemented.
+**Implementation status:** Architecture defined, proof-of-concept examples exist (`examples/mmap-pre-populate`, `examples/mmap-page-fault`).
+
+See [Memory-Mapped Files (Layer 2)](Hooking-Implementation/Virtual-Files/Memory-Mapped-Files.md) for detailed implementation guidance.
 
 ## DirectStorage
 
-!!! info "TODO: Document DirectStorage considerations"
+!!! info "Layer 1 works everywhere, Layer 2 needs IoRing support on Windows 11"
 
-    DirectStorage is a Windows API for high-speed asset loading that bypasses the Win32 API.
+**Layer 1 (File Redirection):**
 
-TODO: Document DirectStorage compatibility. From previous observations, DirectStorage makes calls to ntdll that should work fine with VFS hooks. Worst case, DirectStorage can be forced to fall back to standard APIs.
+- ✅ Works everywhere - DirectStorage opens files through ntdll APIs we already hook
+- DirectStorage reads from the redirected file location
+- No read operation hooking needed for redirection
+
+**Layer 2 (Virtual Files):**
+
+- Windows 10/Wine: Uses `NtReadFile` (already hooked for Layer 2)
+- Windows 11: Uses IoRing - requires hooking (`CreateIoRing`, `BuildIoRingReadFile`, `SubmitIoRing`, `PopIoRingCompletion`, etc.)
+- Alternative: Force legacy mode with `ForceMappingLayer` flag (loses performance benefits)
+
+**Impact:** Low - minimal games use DirectStorage yet. Most games still use traditional I/O.
+
+See [DirectStorage & IoRing (Layer 2)](Hooking-Implementation/Virtual-Files/DirectStorage.md) for detailed implementation guidance.
 
 ## DLL Hijacking Load Order
 
-!!! info "TODO: Document DLL hijacking considerations"
+!!! info "VFS must load before external mod loaders that use DLL hijacking"
 
-    DLL hijacking is a technique where a DLL is placed in a specific location to override system DLLs.
+    This only affects software like Nexus Mods App that wraps external mod loaders (SKSE, Preloader, etc.).
 
-TODO: Document adding an import for the VFS DLL/Mod Loader in the PE header, and verify it works in both Windows and Wine.
+**The Problem:**
+
+- External mod loaders use DLL hijacking (`version.dll`, `d3dx9_42.dll`, etc.) to inject early
+- VFS must load before these to intercept their file operations
+
+**Solution 1: PE Import Patching**
+
+- ✅ Add VFS DLL as first import in EXE's import table - guarantees load order
+- ⚠️ Mod loader DLLs must still exist on disk (Windows loader Phase 1 limitation)
+- Can be done at runtime (requires launcher) or on disk (persistent modification)
+
+**Solution 2: Manual Loading**
+
+- ✅ Hook EXE entry point and manually load mod loaders as virtual files
+- ✅ Mod loaders can be fully virtual (don't need to exist on disk)
+- ⚠️ More complex - requires parsing import table and handling dependencies
+
+**Impact:** None for regular games. Only affects Nexus Mods App integration with external mod loaders.
+
+See [DLL Hijacking and Early Loading](DLL-Hijacking.md) for detailed implementation guidance.
 
 ## Unsupported Features
 
