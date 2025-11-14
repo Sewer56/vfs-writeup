@@ -69,6 +69,8 @@ plugins:
 
 nav:
   - Home: index.md
+  - FileSystem Architecture: Filesystem-Architecture.md
+  - Implementation Strategy: Implementation-Strategy.md
   - Behaviours: Behaviours.md
   - Technology Integrations:
       - DirectStorage & IoRing: Technology-Integrations/DirectStorage.md

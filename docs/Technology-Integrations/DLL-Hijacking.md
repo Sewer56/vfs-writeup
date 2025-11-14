@@ -1,6 +1,6 @@
 !!! note "Nexus Mods App & External Use Only"
 
-    This page only concerns software like the Nexus Mods App, which needs to wrap external mod loaders with the VFS.<br/><br/>
+    This page only concerns software like the Nexus Mods App, which needs to wrap external mod loaders with the VFS.<br/>
 
     This does not apply to modding frameworks like Reloaded3.
 
