@@ -284,10 +284,10 @@ This documentation iterates and improves upon two major implementations:
 
 **Separation of Archive Emulation and Virtual Files**
 
-Reloaded-II's `FileEmulationFramework` was originally designed for **archive replacement** - creating emulated archives lazily when accessed to avoid generating massive files up front.
+Reloaded-II's `FileEmulationFramework` was originally designed for **archive emulation** - creating virtual files (emulated) to avoid creating massive files on disk.
 
 !!! example "Original Use Case"
-    Replace a 60GB game archive with an emulated version, without using disk space.
+    Replace a 60GB game archive with an emulated version, without using extra disk space.
 
 Over time, new requirements emerged: **NxVFS** integration and **synthesizing arbitrary files** (e.g., adding files to a game's load list). This created architectural inconsistency - some files lazy, others up front - and unnecessary coupling between archive emulation and virtual file management.
 
