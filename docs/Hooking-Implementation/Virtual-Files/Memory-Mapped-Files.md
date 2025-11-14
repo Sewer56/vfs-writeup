@@ -1,4 +1,4 @@
-# Memory Map Hooking
+# Memory Mapped Files (Layer 2)
 
 !!! info "Layer 2 Only"
     
@@ -15,7 +15,7 @@ Memory-mapped files map a file's contents directly into a process's virtual addr
 
 !!! note "Rare in Games"
 
-    Memory-mapped files are rare in games. Decades of optical disc distribution shaped game I/O around sequential streaming, not random access. Modern engines prefer explicit asynchronous I/O (Win32 overlapped API, [DirectStorage](./DirectStorage.md)) over memory mapping. I (Sewer) have not yet seen a game that uses memory mapping.
+    I (Sewer) have not yet had anyone report a game that uses memory mapping if that's anything to go by.
 
 The VFS must support memory mapping despite its rarity. The challenge: virtual files have no physical backing for `NtCreateSection`. The VFS must create legitimate section objects, intercept page faults during access, and synthesise content on-demand.
 
@@ -369,3 +369,9 @@ Both examples demonstrate the same five-hook lifecycle:
 - **How much overhead does VectoredExceptionHandler add?** Precise measurements needed for page fault latency under various loads (single-threaded, multi-threaded, high contention).
 
 - **How do we handle write-mapped sections?** Supporting `PAGE_READWRITE` sections requires dirty page tracking (`NtGetWriteWatch`, `NtResetWriteWatch`) and write-back logic.
+
+## Implementation Recommendation
+
+!!! tip "Pragmatic Approach"
+    
+    I (Sewer) suggest implementing memory mapping once we run across a game that requires it, given that it's rarely used.

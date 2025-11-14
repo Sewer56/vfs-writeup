@@ -30,7 +30,7 @@ By placing a proxy DLL in the game folder (which is searched before system direc
 !!! info "PE Import Tables"
     Every PE file (executable or DLL) contains an **import table** listing its dependencies - the external DLLs and functions it requires.
 
-![PE Import Table Structure](Images/import_table.png)
+![PE Import Table Structure](Technology-Integrations/Images/import_table.png)
 /// caption
 The PE import table structure listing external DLL dependencies.
 ///

@@ -9,7 +9,7 @@
 
     I haven't added the new Win11 APIs yet to this page.
 
-    For information about `IoRing`/`io_uring`, used in DirectStorage and the like, see [DirectStorage & IoRing](Technology-Integrations/DirectStorage.md#ioring---linux---windows).
+    For information about `IoRing`/`io_uring`, used in DirectStorage and the like, see [DirectStorage & IoRing](Hooking-Implementation/Virtual-Files/DirectStorage.md#whats-an-ioring-anyway).
 
 ## Windows
 

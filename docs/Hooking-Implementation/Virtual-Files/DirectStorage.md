@@ -1,4 +1,4 @@
-# DirectStorage & IoRing Integration
+# DirectStorage & IoRing (Layer 2)
 
 !!! info "Layer 2 Only"
     

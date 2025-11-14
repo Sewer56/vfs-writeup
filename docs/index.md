@@ -16,15 +16,18 @@ This wiki describes the implementation details of a **two-layer architecture** f
 
 - **[Filesystem Architecture](Filesystem-Architecture.md)** - How I/O APIs relate to each other in Windows and Linux
     - Required understanding to implement VFS
-- **[Implementation Strategy](Implementation-Strategy.md)** - Which APIs to hook and what to do in those hooks for Layer 1 and Layer 2
 - **[Behaviours & Limitations](Behaviours.md)** - Design constraints, write behaviour, platform-specific limitations, and edge cases
-
-**Technology Integrations**
-
-- **[DirectStorage & IoRing](Technology-Integrations/DirectStorage.md)** - Supporting the new Windows 11 IoRing API, which powers DirectStorage under the hood
-- **[DLL Hijacking](Technology-Integrations/DLL-Hijacking.md)** - Loading VFS before external mod loaders using PE import patching
+- **[DLL Hijacking](DLL-Hijacking.md)** - Loading VFS before external mod loaders using PE import patching
     - Needed for software like Nexus Mods App that wrap around external mod loaders
-- **[Memory Map Hooking](Technology-Integrations/Memory-Map-Hooking.md)** - Emulating memory-mapped virtual files with page fault handling
+
+**Hooking Implementation**
+
+- **[Overview](Hooking-Implementation/Overview.md)** - Hooking strategy and implementation approach for intercepting file I/O
+- **[File Redirection (Layer 1)](Hooking-Implementation/File-Redirection.md)** - Which APIs to hook for path redirection and virtual file visibility
+- **Virtual Files (Layer 2)** - Handling virtual file data synthesis and read operations
+    - **[Standard I/O](Hooking-Implementation/Virtual-Files/Standard-IO.md)** - Hooking read/write operations for virtual files
+    - **[Memory Mapped Files](Hooking-Implementation/Virtual-Files/Memory-Mapped-Files.md)** - Emulating memory-mapped virtual files with page fault handling
+    - **[DirectStorage & IoRing](Hooking-Implementation/Virtual-Files/DirectStorage.md)** - Supporting the new Windows 11 IoRing API
 
 **Virtual FileSystem Architecture**
 
@@ -295,3 +298,6 @@ Over time, new requirements emerged: **NxVFS** integration and **synthesizing ar
 - Added support for Memory Maps.
 - Added missing NtOpenFile API and other missing APIs, walked through entire kernel32 API for I/O, making graphs in this document.
 - APIs use handles to unregister/dispose.
+- Added Support for IoRing
+
+And various other improvements all around detailed here.

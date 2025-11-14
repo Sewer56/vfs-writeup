@@ -70,12 +70,15 @@ plugins:
 nav:
   - Home: index.md
   - FileSystem Architecture: Filesystem-Architecture.md
-  - Implementation Strategy: Implementation-Strategy.md
   - Behaviours: Behaviours.md
-  - Technology Integrations:
-      - DirectStorage & IoRing: Technology-Integrations/DirectStorage.md
-      - DLL Hijacking: Technology-Integrations/DLL-Hijacking.md
-      - Memory Map Hooking: Technology-Integrations/Memory-Map-Hooking.md
+  - DLL Hijacking: DLL-Hijacking.md
+  - Hooking Implementation:
+      - Overview: Hooking-Implementation/Overview.md
+      - File Redirection (Layer 1): Hooking-Implementation/File-Redirection.md
+      - Virtual Files (Layer 2):
+          - Standard I/O: Hooking-Implementation/Virtual-Files/Standard-IO.md
+          - Memory Mapped Files: Hooking-Implementation/Virtual-Files/Memory-Mapped-Files.md
+          - DirectStorage & IoRing: Hooking-Implementation/Virtual-Files/DirectStorage.md
   - Virtual FileSystem:
       - About: Virtual-FileSystem/About.md
       - Usage:
