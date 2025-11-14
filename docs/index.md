@@ -29,17 +29,19 @@ This wiki describes the implementation details of a **two-layer architecture** f
     - **[Memory Mapped Files](Hooking-Implementation/Virtual-Files/Memory-Mapped-Files.md)** - Emulating memory-mapped virtual files with page fault handling
     - **[DirectStorage & IoRing](Hooking-Implementation/Virtual-Files/DirectStorage.md)** - Supporting the new Windows 11 IoRing API
 
-**Virtual FileSystem Architecture**
+**Extra Virtual FileSystem Implementation Details**
 
 - **[Layer 1: Virtual FileSystem](Virtual-FileSystem/About.md)** - Path redirection and virtual file injection without administrator rights or filesystem modifications
-- **[Layer 2: Virtual File Framework](File-Emulation-Framework/About.md)** - Handles virtual file data synthesis and read operations for extensions
-- **[Layer 3: Archive Emulation Framework](File-Emulation-Framework/About.md)** - Extensions for injecting files into game archives without writing code
+- **Layer 2: Virtual File Framework** - Handles virtual file data synthesis and read operations for extensions
+- **Layer 3**:
+    - **[Archive Emulation Framework](File-Emulation-Framework/About.md)** - Extension for injecting files into game archives without writing code
+    - **Nx2VFS** - Archive-backed filesystem providing normal file access to files inside compressed `.nx2` archives
 
-!!! info "Complete Layer 2 & Layer 3 documentation isn't here yet"
+!!! info "Layer 2 & Layer 3 aren't complete yet!"
 
-    Files inside the `File-Emulation-Framework` folder are drafts provided as reference only, not final.
+    Files inside the (Archive) `File-Emulation-Framework` folder are drafts (reference only), not final.
 
-    This has been copied as-is from the Reloaded3 planning doc; and need additional refinements:
+    They've been copied as-is from Reloaded3 planning; and need additional refinements for updated design:
     
     - Extract Layer 2 stuff into `Virtual File Framework`
     - Extract Layer 3 stuff into `Archive Emulation Framework`
