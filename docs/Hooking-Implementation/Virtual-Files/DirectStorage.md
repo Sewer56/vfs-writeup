@@ -293,7 +293,9 @@ Hook the following IoRing functions:
 
 #### Implementation Guide
 
-The following is **pseudocode** demonstrating IoRing hooking for Layer 2 virtual file synthesis.
+!!! note "The following is **pseudocode** demonstrating IoRing hooking for Layer 2 virtual file synthesis."
+
+    No demo, time was lacking.
 
 !!! note "API Naming"
     
